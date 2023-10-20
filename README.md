@@ -32,6 +32,8 @@ docker build -t ksp_bridge:humble .
 
 ![up_and_down_assembly](doc/img/server_settings.jpg)
 
+![Arianne 5 landing with ksp_bridge connected](doc/img/ksp-arianne-5-landing.png)
+
 **Note**: *Max. time per update* is required to be high, but it affects the framerate.
 
 ### 2. Running the docker container
