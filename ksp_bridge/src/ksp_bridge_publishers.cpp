@@ -323,7 +323,6 @@ bool KSPBridge::gather_celestial_bodies_data(NamedReferenceFrame& frame)
             body_data.has_atmospheric_oxygen = body.has_atmospheric_oxygen();
             body_data.flying_high_altitude_threshold = body.flying_high_altitude_threshold();
             body_data.space_high_altitude_threshold = body.space_high_altitude_threshold();
-            body_data.flying_high_altitude_threshold = body.flying_high_altitude_threshold();
 
             body_data.position = tuple2vector3(body.position(frame.refrence_frame));
             body_data.velocity = tuple2vector3(body.velocity(frame.refrence_frame));
