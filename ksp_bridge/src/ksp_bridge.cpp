@@ -49,6 +49,18 @@ KSPBridge::KSPBridge()
 
 void KSPBridge::connect()
 {
+    // Drop anything tied to the old client before we replace it. If the
+    // connection is already dead, .remove() will throw and be swallowed.
+    teardown_fast_streams();
+    if (m_active_vessel_stream_valid) {
+        try {
+            m_active_vessel_stream.remove();
+        } catch (...) {
+        }
+        m_active_vessel_stream = {};
+        m_active_vessel_stream_valid = false;
+    }
+
     while (rclcpp::ok()) {
         try {
             m_ksp_client = std::make_unique<krpc::Client>(krpc::connect("ksp_bridge"));
@@ -86,6 +98,25 @@ void KSPBridge::validate_active_vessel()
         connect();
         find_active_vessel();
         return;
+    }
+
+    // Fast path: read the streamed active_vessel handle (no RPC). Only
+    // rebuild m_vessel and tear down the per-vessel stream bundle when the
+    // server reports a different vessel (stage separation, EVA, switch).
+    if (m_active_vessel_stream_valid) {
+        try {
+            auto current = m_active_vessel_stream();
+            if (!(current == *m_vessel)) {
+                RCLCPP_INFO(get_logger(), "Active vessel changed, rebuilding fast streams.");
+                teardown_fast_streams();
+                m_vessel = std::make_unique<krpc::services::SpaceCenter::Vessel>(current);
+            }
+            return;
+        } catch (...) {
+            // Stream read failed — fall through to the direct-call path
+            // and let find_active_vessel re-establish the stream.
+            m_active_vessel_stream_valid = false;
+        }
     }
 
     bool is_valid = false;
@@ -422,6 +453,21 @@ void KSPBridge::find_active_vessel()
             RCLCPP_INFO(get_logger(), "Searching active vessel ...");
         }
         rclcpp::sleep_for(std::chrono::seconds(1));
+    }
+
+    // Register the streamed handle so subsequent validate_active_vessel()
+    // calls can read it without a per-tick RPC. Not fatal if this fails —
+    // validate_active_vessel falls back to the direct-call path.
+    if (!m_active_vessel_stream_valid) {
+        try {
+            m_active_vessel_stream = m_space_center->active_vessel_stream();
+            (void)m_active_vessel_stream();
+            m_active_vessel_stream_valid = true;
+        } catch (const std::exception& ex) {
+            RCLCPP_WARN(get_logger(),
+                "active_vessel_stream setup failed, falling back to per-tick RPC: %s",
+                ex.what());
+        }
     }
 
     init_celestial_bodies();

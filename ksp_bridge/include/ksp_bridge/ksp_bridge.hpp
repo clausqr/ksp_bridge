@@ -143,6 +143,11 @@ private:
     void setup_fast_streams(NamedReferenceFrame& frame);
     void teardown_fast_streams();
 
+    // Streamed active_vessel handle so validate_active_vessel() reads a
+    // cached value instead of making one direct RPC per tick per timer.
+    krpc::Stream<krpc::services::SpaceCenter::Vessel> m_active_vessel_stream;
+    bool m_active_vessel_stream_valid = false;
+
     std::unique_ptr<krpc::Client> m_ksp_client;
     std::unique_ptr<krpc::services::KRPC> m_krpc;
     std::unique_ptr<krpc::services::SpaceCenter> m_space_center;
