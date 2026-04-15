@@ -1,3 +1,6 @@
+#include <chrono>
+#include <stdexcept>
+
 #include <krpc/services/krpc.hpp>
 #include <ksp_bridge/ksp_bridge.hpp>
 #include <ksp_bridge/utils.hpp>
@@ -5,17 +8,31 @@
 KSPBridge::KSPBridge()
     : rclcpp::Node("ksp_bridge")
 {
-    declare_parameter<int64_t>("update_interval", 10);
+    declare_parameter<double>("publish_rate_hz", 10.0);
     declare_parameter<std::vector<std::string>>("celestial_bodies", {"kerbin"});
 
-    int64_t update_interval = get_parameter("update_interval").as_int();
+    double publish_rate_hz = get_parameter("publish_rate_hz").as_double();
     m_param_celestial_bodies = get_parameter("celestial_bodies").as_string_array();
+
+    if (publish_rate_hz <= 0.0) {
+        RCLCPP_FATAL(get_logger(), "publish_rate_hz must be > 0, got %f", publish_rate_hz);
+        throw std::invalid_argument("publish_rate_hz must be > 0");
+    }
+    if (publish_rate_hz > 50.0) {
+        RCLCPP_WARN_ONCE(get_logger(),
+            "publish_rate_hz=%f exceeds kRPC's ~50 Hz physics-tick ceiling; "
+            "values above the in-game Physics.fixedDeltaTime rate will yield duplicate "
+            "samples from the same physics frame. See the kRPC server window "
+            "(\"Max time per update\" and \"Blocking receives\") if this is intentional.",
+            publish_rate_hz);
+    }
 
     connect();
     find_active_vessel();
 
-    uint64_t update_interval_ms = 1000 / update_interval;
-    m_publish_timer = create_wall_timer(std::chrono::milliseconds(update_interval_ms),
+    auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::duration<double>(1.0 / publish_rate_hz));
+    m_publish_timer = create_wall_timer(period,
         std::bind(&KSPBridge::publish_data, this));
 }
 
