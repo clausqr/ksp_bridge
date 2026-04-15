@@ -21,8 +21,22 @@ void KSPBridge::publish_fast()
     if (!m_fast_streams) {
         setup_fast_streams(frame);
         if (!m_fast_streams) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                "fast-group streams unavailable; publish_fast ticks dropped");
             return;
         }
+    }
+
+    // Control fields are still on direct RPCs (WP5 scope). Gather them
+    // BEFORE the frozen block so (a) they don't corrupt stream
+    // frame-consistency and (b) if gather_control_data throws and
+    // invalidates the vessel, we short-circuit before freezing.
+    if (gather_control_data(frame)) {
+        m_control_publisher->publish(m_control_data);
+    }
+
+    if (!m_fast_streams) {
+        return;
     }
 
     // Pin stream values to one physics frame so fields read in the same
@@ -40,10 +54,6 @@ void KSPBridge::publish_fast()
 
         if (gather_vessel_data(frame)) {
             m_vessel_publisher->publish(m_vessel_data);
-        }
-
-        if (gather_control_data(frame)) {
-            m_control_publisher->publish(m_control_data);
         }
 
         if (gather_flight_data(frame)) {
@@ -128,13 +138,19 @@ bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
 
         m_vessel_data.inertia.m = mass;
         m_vessel_data.inertia.com = tuple2vector3(position);
-        // TODO: check this
-        m_vessel_data.inertia.ixx = inertia[0];
-        m_vessel_data.inertia.ixy = inertia[1];
-        m_vessel_data.inertia.ixz = inertia[2];
-        m_vessel_data.inertia.iyy = inertia[3];
-        m_vessel_data.inertia.iyz = inertia[4];
-        m_vessel_data.inertia.izz = inertia[5];
+        if (inertia.size() >= 6) {
+            // TODO: check this
+            m_vessel_data.inertia.ixx = inertia[0];
+            m_vessel_data.inertia.ixy = inertia[1];
+            m_vessel_data.inertia.ixz = inertia[2];
+            m_vessel_data.inertia.iyy = inertia[3];
+            m_vessel_data.inertia.iyz = inertia[4];
+            m_vessel_data.inertia.izz = inertia[5];
+        } else {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                "vessel_inertia_tensor returned %zu values; expected 6, leaving previous values",
+                inertia.size());
+        }
 
         m_vessel_data.position = tuple2vector3(position);
         m_vessel_data.velocity = tuple2vector3(s.vessel_velocity());

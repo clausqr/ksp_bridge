@@ -109,6 +109,105 @@ void KSPBridge::invalidate_active_vessel()
 
 void KSPBridge::teardown_fast_streams()
 {
+    if (!m_fast_streams) {
+        return;
+    }
+    auto& b = *m_fast_streams;
+    auto safe_remove = [](auto& stream) {
+        try {
+            stream.remove();
+        } catch (...) {
+            // Swallow: we're tearing down anyway, and the server-side
+            // stream may already be gone if the vessel was destroyed.
+        }
+    };
+
+    safe_remove(b.vessel_name);
+    safe_remove(b.vessel_type);
+    safe_remove(b.vessel_situation);
+    safe_remove(b.vessel_recoverable);
+    safe_remove(b.vessel_met);
+    safe_remove(b.vessel_biome);
+    safe_remove(b.vessel_crew_capacity);
+    safe_remove(b.vessel_crew_count);
+    safe_remove(b.vessel_mass);
+    safe_remove(b.vessel_dry_mass);
+    safe_remove(b.vessel_thrust);
+    safe_remove(b.vessel_available_thrust);
+    safe_remove(b.vessel_max_thrust);
+    safe_remove(b.vessel_max_vacuum_thrust);
+    safe_remove(b.vessel_specific_impulse);
+    safe_remove(b.vessel_vacuum_specific_impulse);
+    safe_remove(b.vessel_kerbin_sea_level_specific_impulse);
+    safe_remove(b.vessel_moment_of_inertia);
+    safe_remove(b.vessel_inertia_tensor);
+    safe_remove(b.vessel_position);
+    safe_remove(b.vessel_velocity);
+    safe_remove(b.vessel_rotation);
+    safe_remove(b.vessel_direction);
+    safe_remove(b.vessel_angular_velocity);
+
+    safe_remove(b.flight_g_force);
+    safe_remove(b.flight_mean_altitude);
+    safe_remove(b.flight_surface_altitude);
+    safe_remove(b.flight_bedrock_altitude);
+    safe_remove(b.flight_velocity);
+    safe_remove(b.flight_speed);
+    safe_remove(b.flight_horizontal_speed);
+    safe_remove(b.flight_vertical_speed);
+    safe_remove(b.flight_center_of_mass);
+    safe_remove(b.flight_rotation);
+    safe_remove(b.flight_direction);
+    safe_remove(b.flight_pitch);
+    safe_remove(b.flight_heading);
+    safe_remove(b.flight_roll);
+    safe_remove(b.flight_prograde);
+    safe_remove(b.flight_retrograde);
+    safe_remove(b.flight_normal);
+    safe_remove(b.flight_anti_normal);
+    safe_remove(b.flight_radial);
+    safe_remove(b.flight_anti_radial);
+    safe_remove(b.flight_atmosphere_density);
+    safe_remove(b.flight_dynamic_pressure);
+    safe_remove(b.flight_static_pressure);
+    safe_remove(b.flight_static_pressure_at_msl);
+    safe_remove(b.flight_aerodynamic_force);
+    safe_remove(b.flight_lift);
+    safe_remove(b.flight_drag);
+    safe_remove(b.flight_speed_of_sound);
+    safe_remove(b.flight_mach);
+    safe_remove(b.flight_true_air_speed);
+    safe_remove(b.flight_equivalent_air_speed);
+    safe_remove(b.flight_terminal_velocity);
+    safe_remove(b.flight_angle_of_attack);
+    safe_remove(b.flight_sideslip_angle);
+    safe_remove(b.flight_total_air_temperature);
+    safe_remove(b.flight_static_air_temperature);
+
+    safe_remove(b.orbit_apoapsis);
+    safe_remove(b.orbit_periapsis);
+    safe_remove(b.orbit_apoapsis_altitude);
+    safe_remove(b.orbit_periapsis_altitude);
+    safe_remove(b.orbit_semi_major_axis);
+    safe_remove(b.orbit_semi_minor_axis);
+    safe_remove(b.orbit_radius);
+    safe_remove(b.orbit_speed);
+    safe_remove(b.orbit_period);
+    safe_remove(b.orbit_time_to_apoapsis);
+    safe_remove(b.orbit_time_to_periapsis);
+    safe_remove(b.orbit_eccentricity);
+    safe_remove(b.orbit_inclination);
+    safe_remove(b.orbit_longitude_of_ascending_node);
+    safe_remove(b.orbit_argument_of_periapsis);
+    safe_remove(b.orbit_mean_anomaly_at_epoch);
+    safe_remove(b.orbit_epoch);
+    safe_remove(b.orbit_mean_anomaly);
+    safe_remove(b.orbit_eccentric_anomaly);
+    safe_remove(b.orbit_true_anomaly);
+    safe_remove(b.orbit_orbital_speed);
+    safe_remove(b.orbit_time_to_soi_change);
+    safe_remove(b.orbit_body);
+
     m_fast_streams.reset();
 }
 
