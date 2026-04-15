@@ -103,7 +103,120 @@ void KSPBridge::validate_active_vessel()
 void KSPBridge::invalidate_active_vessel()
 {
     m_vessel = nullptr;
+    teardown_fast_streams();
     RCLCPP_WARN(get_logger(), "Vessel has been invalidated.");
+}
+
+void KSPBridge::teardown_fast_streams()
+{
+    m_fast_streams.reset();
+}
+
+void KSPBridge::setup_fast_streams(NamedReferenceFrame& frame)
+{
+    if (!m_vessel) {
+        return;
+    }
+
+    auto b = std::make_unique<FastStreams>();
+    try {
+        auto flight = m_vessel->flight(frame.refrence_frame);
+        auto orbit = m_vessel->orbit();
+
+        b->orbit_body_name = orbit.body().name();
+
+        b->vessel_name = m_vessel->name_stream();
+        b->vessel_type = m_vessel->type_stream();
+        b->vessel_situation = m_vessel->situation_stream();
+        b->vessel_recoverable = m_vessel->recoverable_stream();
+        b->vessel_met = m_vessel->met_stream();
+        b->vessel_biome = m_vessel->biome_stream();
+        b->vessel_crew_capacity = m_vessel->crew_capacity_stream();
+        b->vessel_crew_count = m_vessel->crew_count_stream();
+        b->vessel_mass = m_vessel->mass_stream();
+        b->vessel_dry_mass = m_vessel->dry_mass_stream();
+        b->vessel_thrust = m_vessel->thrust_stream();
+        b->vessel_available_thrust = m_vessel->available_thrust_stream();
+        b->vessel_max_thrust = m_vessel->max_thrust_stream();
+        b->vessel_max_vacuum_thrust = m_vessel->max_vacuum_thrust_stream();
+        b->vessel_specific_impulse = m_vessel->specific_impulse_stream();
+        b->vessel_vacuum_specific_impulse = m_vessel->vacuum_specific_impulse_stream();
+        b->vessel_kerbin_sea_level_specific_impulse = m_vessel->kerbin_sea_level_specific_impulse_stream();
+        b->vessel_moment_of_inertia = m_vessel->moment_of_inertia_stream();
+        b->vessel_inertia_tensor = m_vessel->inertia_tensor_stream();
+
+        b->vessel_position = m_vessel->position_stream(frame.refrence_frame);
+        b->vessel_velocity = m_vessel->velocity_stream(frame.refrence_frame);
+        b->vessel_rotation = m_vessel->rotation_stream(frame.refrence_frame);
+        b->vessel_direction = m_vessel->direction_stream(frame.refrence_frame);
+        b->vessel_angular_velocity = m_vessel->angular_velocity_stream(frame.refrence_frame);
+
+        b->flight_g_force = flight.g_force_stream();
+        b->flight_mean_altitude = flight.mean_altitude_stream();
+        b->flight_surface_altitude = flight.surface_altitude_stream();
+        b->flight_bedrock_altitude = flight.bedrock_altitude_stream();
+        b->flight_velocity = flight.velocity_stream();
+        b->flight_speed = flight.speed_stream();
+        b->flight_horizontal_speed = flight.horizontal_speed_stream();
+        b->flight_vertical_speed = flight.vertical_speed_stream();
+        b->flight_center_of_mass = flight.center_of_mass_stream();
+        b->flight_rotation = flight.rotation_stream();
+        b->flight_direction = flight.direction_stream();
+        b->flight_pitch = flight.pitch_stream();
+        b->flight_heading = flight.heading_stream();
+        b->flight_roll = flight.roll_stream();
+        b->flight_prograde = flight.prograde_stream();
+        b->flight_retrograde = flight.retrograde_stream();
+        b->flight_normal = flight.normal_stream();
+        b->flight_anti_normal = flight.anti_normal_stream();
+        b->flight_radial = flight.radial_stream();
+        b->flight_anti_radial = flight.anti_radial_stream();
+        b->flight_atmosphere_density = flight.atmosphere_density_stream();
+        b->flight_dynamic_pressure = flight.dynamic_pressure_stream();
+        b->flight_static_pressure = flight.static_pressure_stream();
+        b->flight_static_pressure_at_msl = flight.static_pressure_at_msl_stream();
+        b->flight_aerodynamic_force = flight.aerodynamic_force_stream();
+        b->flight_lift = flight.lift_stream();
+        b->flight_drag = flight.drag_stream();
+        b->flight_speed_of_sound = flight.speed_of_sound_stream();
+        b->flight_mach = flight.mach_stream();
+        b->flight_true_air_speed = flight.true_air_speed_stream();
+        b->flight_equivalent_air_speed = flight.equivalent_air_speed_stream();
+        b->flight_terminal_velocity = flight.terminal_velocity_stream();
+        b->flight_angle_of_attack = flight.angle_of_attack_stream();
+        b->flight_sideslip_angle = flight.sideslip_angle_stream();
+        b->flight_total_air_temperature = flight.total_air_temperature_stream();
+        b->flight_static_air_temperature = flight.static_air_temperature_stream();
+
+        b->orbit_apoapsis = orbit.apoapsis_stream();
+        b->orbit_periapsis = orbit.periapsis_stream();
+        b->orbit_apoapsis_altitude = orbit.apoapsis_altitude_stream();
+        b->orbit_periapsis_altitude = orbit.periapsis_altitude_stream();
+        b->orbit_semi_major_axis = orbit.semi_major_axis_stream();
+        b->orbit_semi_minor_axis = orbit.semi_minor_axis_stream();
+        b->orbit_radius = orbit.radius_stream();
+        b->orbit_speed = orbit.speed_stream();
+        b->orbit_period = orbit.period_stream();
+        b->orbit_time_to_apoapsis = orbit.time_to_apoapsis_stream();
+        b->orbit_time_to_periapsis = orbit.time_to_periapsis_stream();
+        b->orbit_eccentricity = orbit.eccentricity_stream();
+        b->orbit_inclination = orbit.inclination_stream();
+        b->orbit_longitude_of_ascending_node = orbit.longitude_of_ascending_node_stream();
+        b->orbit_argument_of_periapsis = orbit.argument_of_periapsis_stream();
+        b->orbit_mean_anomaly_at_epoch = orbit.mean_anomaly_at_epoch_stream();
+        b->orbit_epoch = orbit.epoch_stream();
+        b->orbit_mean_anomaly = orbit.mean_anomaly_stream();
+        b->orbit_eccentric_anomaly = orbit.eccentric_anomaly_stream();
+        b->orbit_true_anomaly = orbit.true_anomaly_stream();
+        b->orbit_orbital_speed = orbit.orbital_speed_stream();
+        b->orbit_time_to_soi_change = orbit.time_to_soi_change_stream();
+    } catch (const std::exception& ex) {
+        RCLCPP_ERROR(get_logger(), "setup_fast_streams failed: %s", ex.what());
+        return;
+    }
+
+    m_fast_streams = std::move(b);
+    RCLCPP_INFO(get_logger(), "Fast-group kRPC streams registered.");
 }
 
 void KSPBridge::find_active_vessel()

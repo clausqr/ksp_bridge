@@ -18,6 +18,20 @@ void KSPBridge::publish_fast()
     frame.refrence_frame = m_refrence_frame.refrence_frame;
     m_refrence_frame.lock.unlock();
 
+    if (!m_fast_streams) {
+        setup_fast_streams(frame);
+        if (!m_fast_streams) {
+            return;
+        }
+    }
+
+    // TODO: wrap the four gather_* calls in freeze_streams/thaw_streams
+    // once we've verified that all streams in FastStreams are started
+    // (warmed up) during setup_fast_streams. Freezing while a stream
+    // hasn't received its first value will deadlock because operator()
+    // auto-starts it and waits on a condition variable gated by the
+    // frozen update thread.
+
     if (gather_vessel_data(frame)) {
         m_vessel_publisher->publish(m_vessel_data);
     }
@@ -71,49 +85,55 @@ void KSPBridge::publish_bodies()
 
 bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
 {
-    if (!m_vessel) {
+    if (!m_vessel || !m_fast_streams) {
         return false;
     }
     try {
+        auto& s = *m_fast_streams;
+
         m_vessel_data.header.frame_id = frame.name;
         m_vessel_data.header.stamp = now();
-        m_vessel_data.name = m_vessel->name();
-        m_vessel_data.type = (uint8_t)m_vessel->type();
-        m_vessel_data.situation = (uint8_t)m_vessel->situation();
-        m_vessel_data.recoverable = m_vessel->recoverable();
+        m_vessel_data.name = s.vessel_name();
+        m_vessel_data.type = (uint8_t)s.vessel_type();
+        m_vessel_data.situation = (uint8_t)s.vessel_situation();
+        m_vessel_data.recoverable = s.vessel_recoverable();
 
-        m_vessel_data.met = m_vessel->met();
-        m_vessel_data.biome = m_vessel->biome();
-        m_vessel_data.crew_capacity = m_vessel->crew_capacity();
-        m_vessel_data.crew_count = m_vessel->crew_count();
-        m_vessel_data.mass = m_vessel->mass();
-        m_vessel_data.dry_mass = m_vessel->dry_mass();
+        m_vessel_data.met = s.vessel_met();
+        m_vessel_data.biome = s.vessel_biome();
+        m_vessel_data.crew_capacity = s.vessel_crew_capacity();
+        m_vessel_data.crew_count = s.vessel_crew_count();
+        float mass = s.vessel_mass();
+        m_vessel_data.mass = mass;
+        m_vessel_data.dry_mass = s.vessel_dry_mass();
 
-        m_vessel_data.thrust = m_vessel->thrust();
-        m_vessel_data.available_thrust = m_vessel->available_thrust();
-        m_vessel_data.max_thrust = m_vessel->max_thrust();
-        m_vessel_data.max_vacuum_thrust = m_vessel->max_vacuum_thrust();
-        m_vessel_data.specific_impulse = m_vessel->specific_impulse();
-        m_vessel_data.vacuum_specific_impulse = m_vessel->vacuum_specific_impulse();
-        m_vessel_data.kerbin_sea_level_specific_impulse = m_vessel->kerbin_sea_level_specific_impulse();
+        m_vessel_data.thrust = s.vessel_thrust();
+        m_vessel_data.available_thrust = s.vessel_available_thrust();
+        m_vessel_data.max_thrust = s.vessel_max_thrust();
+        m_vessel_data.max_vacuum_thrust = s.vessel_max_vacuum_thrust();
+        m_vessel_data.specific_impulse = s.vessel_specific_impulse();
+        m_vessel_data.vacuum_specific_impulse = s.vessel_vacuum_specific_impulse();
+        m_vessel_data.kerbin_sea_level_specific_impulse = s.vessel_kerbin_sea_level_specific_impulse();
 
-        m_vessel_data.moment_of_inertia = tuple2vector3(m_vessel->moment_of_inertia());
+        m_vessel_data.moment_of_inertia = tuple2vector3(s.vessel_moment_of_inertia());
 
-        m_vessel_data.inertia.m = m_vessel->mass();
-        m_vessel_data.inertia.com = tuple2vector3(m_vessel->position(frame.refrence_frame));
+        auto position = s.vessel_position();
+        auto inertia = s.vessel_inertia_tensor();
+
+        m_vessel_data.inertia.m = mass;
+        m_vessel_data.inertia.com = tuple2vector3(position);
         // TODO: check this
-        m_vessel_data.inertia.ixx = m_vessel->inertia_tensor()[0];
-        m_vessel_data.inertia.ixy = m_vessel->inertia_tensor()[1];
-        m_vessel_data.inertia.ixz = m_vessel->inertia_tensor()[2];
-        m_vessel_data.inertia.iyy = m_vessel->inertia_tensor()[3];
-        m_vessel_data.inertia.iyz = m_vessel->inertia_tensor()[4];
-        m_vessel_data.inertia.izz = m_vessel->inertia_tensor()[5];
+        m_vessel_data.inertia.ixx = inertia[0];
+        m_vessel_data.inertia.ixy = inertia[1];
+        m_vessel_data.inertia.ixz = inertia[2];
+        m_vessel_data.inertia.iyy = inertia[3];
+        m_vessel_data.inertia.iyz = inertia[4];
+        m_vessel_data.inertia.izz = inertia[5];
 
-        m_vessel_data.position = tuple2vector3(m_vessel->position(frame.refrence_frame));
-        m_vessel_data.velocity = tuple2vector3(m_vessel->velocity(frame.refrence_frame));
-        m_vessel_data.rotation = tuple2quaternion(m_vessel->rotation(frame.refrence_frame));
-        m_vessel_data.direction = tuple2vector3(m_vessel->direction(frame.refrence_frame));
-        m_vessel_data.angular_velocity = tuple2vector3(m_vessel->angular_velocity(frame.refrence_frame));
+        m_vessel_data.position = tuple2vector3(position);
+        m_vessel_data.velocity = tuple2vector3(s.vessel_velocity());
+        m_vessel_data.rotation = tuple2quaternion(s.vessel_rotation());
+        m_vessel_data.direction = tuple2vector3(s.vessel_direction());
+        m_vessel_data.angular_velocity = tuple2vector3(s.vessel_angular_velocity());
     } catch (const std::exception& ex) {
         RCLCPP_ERROR(get_logger(), "%s:%d: %s", base_name(__FILE__), __LINE__, ex.what());
         invalidate_active_vessel();
@@ -176,51 +196,51 @@ bool KSPBridge::gather_control_data(NamedReferenceFrame& frame)
 
 bool KSPBridge::gather_flight_data(NamedReferenceFrame& frame)
 {
-    if (!m_vessel) {
+    if (!m_vessel || !m_fast_streams) {
         return false;
     }
     try {
-        auto flight = m_vessel->flight(frame.refrence_frame);
+        auto& s = *m_fast_streams;
 
         m_flight_data.header.frame_id = frame.name;
         m_flight_data.header.stamp = now();
 
-        m_flight_data.g_force = flight.g_force();
-        m_flight_data.mean_altitude = flight.mean_altitude();
-        m_flight_data.surface_altitude = flight.surface_altitude();
-        m_flight_data.bedrock_altitude = flight.bedrock_altitude();
-        m_flight_data.velocity = tuple2vector3(flight.velocity());
-        m_flight_data.speed = flight.speed();
-        m_flight_data.horizontal_speed = flight.horizontal_speed();
-        m_flight_data.vertical_speed = flight.vertical_speed();
-        m_flight_data.center_of_mass = tuple2vector3(flight.center_of_mass());
-        m_flight_data.rotation = tuple2quaternion(flight.rotation());
-        m_flight_data.direction = tuple2vector3(flight.direction());
-        m_flight_data.pitch = flight.pitch();
-        m_flight_data.heading = flight.heading();
-        m_flight_data.roll = flight.roll();
-        m_flight_data.prograde = tuple2vector3(flight.prograde());
-        m_flight_data.retrograde = tuple2vector3(flight.retrograde());
-        m_flight_data.normal = tuple2vector3(flight.normal());
-        m_flight_data.anti_normal = tuple2vector3(flight.anti_normal());
-        m_flight_data.radial = tuple2vector3(flight.radial());
-        m_flight_data.anti_radial = tuple2vector3(flight.anti_radial());
-        m_flight_data.atmosphere_density = flight.atmosphere_density();
-        m_flight_data.dynamic_pressure = flight.dynamic_pressure();
-        m_flight_data.static_pressure = flight.static_pressure();
-        m_flight_data.static_pressure_at_msl = flight.static_pressure_at_msl();
-        m_flight_data.aerodynamic_force = tuple2vector3(flight.aerodynamic_force());
-        m_flight_data.lift = tuple2vector3(flight.lift());
-        m_flight_data.drag = tuple2vector3(flight.drag());
-        m_flight_data.speed_of_sound = flight.speed_of_sound();
-        m_flight_data.mach = flight.mach();
-        m_flight_data.true_air_speed = flight.true_air_speed();
-        m_flight_data.equivalent_air_speed = flight.equivalent_air_speed();
-        m_flight_data.terminal_velocity = flight.terminal_velocity();
-        m_flight_data.angle_of_attack = flight.angle_of_attack();
-        m_flight_data.sideslip_angle = flight.sideslip_angle();
-        m_flight_data.total_air_temperature = flight.total_air_temperature();
-        m_flight_data.static_air_temperature = flight.static_air_temperature();
+        m_flight_data.g_force = s.flight_g_force();
+        m_flight_data.mean_altitude = s.flight_mean_altitude();
+        m_flight_data.surface_altitude = s.flight_surface_altitude();
+        m_flight_data.bedrock_altitude = s.flight_bedrock_altitude();
+        m_flight_data.velocity = tuple2vector3(s.flight_velocity());
+        m_flight_data.speed = s.flight_speed();
+        m_flight_data.horizontal_speed = s.flight_horizontal_speed();
+        m_flight_data.vertical_speed = s.flight_vertical_speed();
+        m_flight_data.center_of_mass = tuple2vector3(s.flight_center_of_mass());
+        m_flight_data.rotation = tuple2quaternion(s.flight_rotation());
+        m_flight_data.direction = tuple2vector3(s.flight_direction());
+        m_flight_data.pitch = s.flight_pitch();
+        m_flight_data.heading = s.flight_heading();
+        m_flight_data.roll = s.flight_roll();
+        m_flight_data.prograde = tuple2vector3(s.flight_prograde());
+        m_flight_data.retrograde = tuple2vector3(s.flight_retrograde());
+        m_flight_data.normal = tuple2vector3(s.flight_normal());
+        m_flight_data.anti_normal = tuple2vector3(s.flight_anti_normal());
+        m_flight_data.radial = tuple2vector3(s.flight_radial());
+        m_flight_data.anti_radial = tuple2vector3(s.flight_anti_radial());
+        m_flight_data.atmosphere_density = s.flight_atmosphere_density();
+        m_flight_data.dynamic_pressure = s.flight_dynamic_pressure();
+        m_flight_data.static_pressure = s.flight_static_pressure();
+        m_flight_data.static_pressure_at_msl = s.flight_static_pressure_at_msl();
+        m_flight_data.aerodynamic_force = tuple2vector3(s.flight_aerodynamic_force());
+        m_flight_data.lift = tuple2vector3(s.flight_lift());
+        m_flight_data.drag = tuple2vector3(s.flight_drag());
+        m_flight_data.speed_of_sound = s.flight_speed_of_sound();
+        m_flight_data.mach = s.flight_mach();
+        m_flight_data.true_air_speed = s.flight_true_air_speed();
+        m_flight_data.equivalent_air_speed = s.flight_equivalent_air_speed();
+        m_flight_data.terminal_velocity = s.flight_terminal_velocity();
+        m_flight_data.angle_of_attack = s.flight_angle_of_attack();
+        m_flight_data.sideslip_angle = s.flight_sideslip_angle();
+        m_flight_data.total_air_temperature = s.flight_total_air_temperature();
+        m_flight_data.static_air_temperature = s.flight_static_air_temperature();
     } catch (const std::exception& ex) {
         RCLCPP_ERROR(get_logger(), "%s:%d: %s", base_name(__FILE__), __LINE__, ex.what());
         invalidate_active_vessel();
@@ -379,35 +399,38 @@ bool KSPBridge::gather_celestial_bodies_data(NamedReferenceFrame& frame)
 
 bool KSPBridge::gather_orbit_data()
 {
-    if (!m_vessel) {
+    if (!m_vessel || !m_fast_streams) {
         return false;
     }
     try {
-        auto orbit = m_vessel->orbit();
+        auto& s = *m_fast_streams;
 
-        m_orbit_data.body = orbit.body().name();
-        m_orbit_data.apoapsis = orbit.apoapsis();
-        m_orbit_data.periapsis = orbit.periapsis();
-        m_orbit_data.apoapsis_altitude = orbit.apoapsis_altitude();
-        m_orbit_data.periapsis_altitude = orbit.periapsis_altitude();
-        m_orbit_data.semi_major_axis = orbit.semi_major_axis();
-        m_orbit_data.semi_minor_axis = orbit.semi_minor_axis();
-        m_orbit_data.radius = orbit.radius();
-        m_orbit_data.speed = orbit.speed();
-        m_orbit_data.period = orbit.period();
-        m_orbit_data.time_to_apoapsis = orbit.time_to_apoapsis();
-        m_orbit_data.time_to_periapsis = orbit.time_to_periapsis();
-        m_orbit_data.eccentricity = orbit.eccentricity();
-        m_orbit_data.inclination = orbit.inclination();
-        m_orbit_data.longitude_of_ascending_node = orbit.longitude_of_ascending_node();
-        m_orbit_data.argument_of_periapsis = orbit.argument_of_periapsis();
-        m_orbit_data.mean_anomaly_at_epoch = orbit.mean_anomaly_at_epoch();
-        m_orbit_data.epoch = orbit.epoch();
-        m_orbit_data.mean_anomaly = orbit.mean_anomaly();
-        m_orbit_data.eccentric_anomaly = orbit.eccentric_anomaly();
-        m_orbit_data.true_anomaly = orbit.true_anomaly();
-        m_orbit_data.orbital_speed = orbit.orbital_speed();
-        m_orbit_data.time_to_soi_change = orbit.time_to_soi_change();
+        // orbit_body_name is cached at setup_fast_streams time; a SOI
+        // transition will show the stale value until the next bundle rebuild
+        // (invalidate or frame change).
+        m_orbit_data.body = s.orbit_body_name;
+        m_orbit_data.apoapsis = s.orbit_apoapsis();
+        m_orbit_data.periapsis = s.orbit_periapsis();
+        m_orbit_data.apoapsis_altitude = s.orbit_apoapsis_altitude();
+        m_orbit_data.periapsis_altitude = s.orbit_periapsis_altitude();
+        m_orbit_data.semi_major_axis = s.orbit_semi_major_axis();
+        m_orbit_data.semi_minor_axis = s.orbit_semi_minor_axis();
+        m_orbit_data.radius = s.orbit_radius();
+        m_orbit_data.speed = s.orbit_speed();
+        m_orbit_data.period = s.orbit_period();
+        m_orbit_data.time_to_apoapsis = s.orbit_time_to_apoapsis();
+        m_orbit_data.time_to_periapsis = s.orbit_time_to_periapsis();
+        m_orbit_data.eccentricity = s.orbit_eccentricity();
+        m_orbit_data.inclination = s.orbit_inclination();
+        m_orbit_data.longitude_of_ascending_node = s.orbit_longitude_of_ascending_node();
+        m_orbit_data.argument_of_periapsis = s.orbit_argument_of_periapsis();
+        m_orbit_data.mean_anomaly_at_epoch = s.orbit_mean_anomaly_at_epoch();
+        m_orbit_data.epoch = s.orbit_epoch();
+        m_orbit_data.mean_anomaly = s.orbit_mean_anomaly();
+        m_orbit_data.eccentric_anomaly = s.orbit_eccentric_anomaly();
+        m_orbit_data.true_anomaly = s.orbit_true_anomaly();
+        m_orbit_data.orbital_speed = s.orbit_orbital_speed();
+        m_orbit_data.time_to_soi_change = s.orbit_time_to_soi_change();
     } catch (const std::exception& ex) {
         RCLCPP_ERROR(get_logger(), "%s:%d: %s", base_name(__FILE__), __LINE__, ex.what());
         invalidate_active_vessel();

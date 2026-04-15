@@ -21,6 +21,7 @@ bool KSPBridge::change_reference_frame(const std::string& name)
         m_refrence_frame.name = "vessel";
         m_refrence_frame.refrence_frame = m_vessel->reference_frame();
         m_refrence_frame.lock.unlock();
+        teardown_fast_streams();
         return true;
     }
 
@@ -31,6 +32,7 @@ bool KSPBridge::change_reference_frame(const std::string& name)
         m_refrence_frame.name = name;
         m_refrence_frame.refrence_frame = it->second.reference_frame();
         m_refrence_frame.lock.unlock();
+        teardown_fast_streams();
         return true;
     }
 
