@@ -154,8 +154,6 @@ void KSPBridge::teardown_fast_streams()
     };
 
     safe_remove(b.vessel_name);
-    safe_remove(b.vessel_type);
-    safe_remove(b.vessel_situation);
     safe_remove(b.vessel_recoverable);
     safe_remove(b.vessel_met);
     safe_remove(b.vessel_biome);
@@ -258,8 +256,6 @@ void KSPBridge::setup_fast_streams(NamedReferenceFrame& frame)
         b->orbit_body_name = b->orbit_body_cached.name();
 
         b->vessel_name = m_vessel->name_stream();
-        b->vessel_type = m_vessel->type_stream();
-        b->vessel_situation = m_vessel->situation_stream();
         b->vessel_recoverable = m_vessel->recoverable_stream();
         b->vessel_met = m_vessel->met_stream();
         b->vessel_biome = m_vessel->biome_stream();
@@ -349,8 +345,6 @@ void KSPBridge::setup_fast_streams(NamedReferenceFrame& frame)
         // block) guarantees subsequent reads inside freeze/thaw won't
         // deadlock on an unstarted stream.
         (void)b->vessel_name();
-        (void)b->vessel_type();
-        (void)b->vessel_situation();
         (void)b->vessel_recoverable();
         (void)b->vessel_met();
         (void)b->vessel_biome();

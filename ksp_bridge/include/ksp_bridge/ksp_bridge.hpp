@@ -47,8 +47,8 @@ private:
     struct FastStreams {
         // vessel (frame-independent)
         krpc::Stream<std::string> vessel_name;
-        krpc::Stream<krpc::services::SpaceCenter::VesselType> vessel_type;
-        krpc::Stream<krpc::services::SpaceCenter::VesselSituation> vessel_situation;
+        // vessel_type / vessel_situation: kRPC C++ decoder has no enum overload,
+        // so streams won't compile. Fetched via direct RPC in gather_vessel_data.
         krpc::Stream<bool> vessel_recoverable;
         krpc::Stream<double> vessel_met;
         krpc::Stream<std::string> vessel_biome;

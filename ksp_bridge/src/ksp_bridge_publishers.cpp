@@ -111,8 +111,8 @@ bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
         m_vessel_data.header.frame_id = frame.name;
         m_vessel_data.header.stamp = now();
         m_vessel_data.name = s.vessel_name();
-        m_vessel_data.type = (uint8_t)s.vessel_type();
-        m_vessel_data.situation = (uint8_t)s.vessel_situation();
+        m_vessel_data.type = (uint8_t)m_vessel->type();
+        m_vessel_data.situation = (uint8_t)m_vessel->situation();
         m_vessel_data.recoverable = s.vessel_recoverable();
 
         m_vessel_data.met = s.vessel_met();
