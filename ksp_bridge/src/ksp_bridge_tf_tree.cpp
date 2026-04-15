@@ -12,6 +12,10 @@ bool KSPBridge::change_reference_frame(const std::string& name)
     }
 
     if (name == "vessel") {
+        if (!m_vessel) {
+            m_refrence_frame.lock.unlock();
+            return false;
+        }
         RCLCPP_INFO(get_logger(), "Reference frame is changed: '%s' -> '%s'", m_refrence_frame.name.c_str(), name.c_str());
 
         m_refrence_frame.name = "vessel";
@@ -37,6 +41,9 @@ bool KSPBridge::change_reference_frame(const std::string& name)
 
 void KSPBridge::send_tf_tree(NamedReferenceFrame& frame)
 {
+    if (!m_vessel) {
+        return;
+    }
     try {
         // world -> kerbin, world = kerbin
         // Note: Kerbin is always present.

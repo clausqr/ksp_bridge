@@ -47,6 +47,9 @@ void KSPBridge::publish_data()
 
 bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
 {
+    if (!m_vessel) {
+        return false;
+    }
     try {
         m_vessel_data.header.frame_id = frame.name;
         m_vessel_data.header.stamp = now();
@@ -98,6 +101,9 @@ bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
 
 bool KSPBridge::gather_control_data(NamedReferenceFrame& frame)
 {
+    if (!m_vessel) {
+        return false;
+    }
     try {
         auto control = m_vessel->control();
 
@@ -146,6 +152,9 @@ bool KSPBridge::gather_control_data(NamedReferenceFrame& frame)
 
 bool KSPBridge::gather_flight_data(NamedReferenceFrame& frame)
 {
+    if (!m_vessel) {
+        return false;
+    }
     try {
         auto flight = m_vessel->flight(frame.refrence_frame);
 
@@ -199,6 +208,9 @@ bool KSPBridge::gather_flight_data(NamedReferenceFrame& frame)
 
 bool KSPBridge::gather_parts_data()
 {
+    if (!m_vessel) {
+        return false;
+    }
     try {
         auto parts = m_vessel->parts().all();
 
@@ -343,6 +355,9 @@ bool KSPBridge::gather_celestial_bodies_data(NamedReferenceFrame& frame)
 
 bool KSPBridge::gather_orbit_data()
 {
+    if (!m_vessel) {
+        return false;
+    }
     try {
         auto orbit = m_vessel->orbit();
 

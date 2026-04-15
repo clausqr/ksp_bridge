@@ -5,6 +5,11 @@ void KSPBridge::next_stage_srv(
     const ksp_bridge_interfaces::srv::Activation::Request::SharedPtr,
     const ksp_bridge_interfaces::srv::Activation::Response::SharedPtr res)
 {
+    if (!m_vessel) {
+        res->succeded = false;
+        res->error = "No active vessel.";
+        return;
+    }
     try {
         m_vessel->control().activate_next_stage();
     } catch (const std::exception& ex) {
@@ -20,6 +25,12 @@ void KSPBridge::set_sas_srv(
     const ksp_bridge_interfaces::srv::SAS::Request::SharedPtr req,
     const ksp_bridge_interfaces::srv::SAS::Response::SharedPtr res)
 {
+    if (!m_vessel) {
+        res->succeded = false;
+        res->error = "No active vessel.";
+        return;
+    }
+
     krpc::services::SpaceCenter::SASMode mode = krpc::services::SpaceCenter::SASMode::stability_assist;
 
     switch (req->mode) {

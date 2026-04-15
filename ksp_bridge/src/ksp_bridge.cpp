@@ -83,15 +83,16 @@ void KSPBridge::find_active_vessel()
     while (rclcpp::ok()) {
         try {
             m_vessel = std::make_unique<krpc::services::SpaceCenter::Vessel>(m_space_center->active_vessel());
+            m_vessel->control().set_input_mode(krpc::services::SpaceCenter::ControlInputMode::override);
+            RCLCPP_INFO(get_logger(), "Vessel found: '%s'", m_vessel->name().c_str());
             break;
         } catch (...) {
+            m_vessel = nullptr;
             RCLCPP_INFO(get_logger(), "Searching active vessel ...");
         }
         rclcpp::sleep_for(std::chrono::seconds(1));
     }
 
-    m_vessel->control().set_input_mode(krpc::services::SpaceCenter::ControlInputMode::override);
-    RCLCPP_INFO(get_logger(), "Vessel found: '%s'", m_vessel->name().c_str());
     init_celestial_bodies();
     init_interfaces();
 }
