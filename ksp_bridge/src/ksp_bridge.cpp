@@ -63,7 +63,16 @@ void KSPBridge::connect()
 
     while (rclcpp::ok()) {
         try {
-            m_ksp_client = std::make_unique<krpc::Client>(krpc::connect("ksp_bridge"));
+            // Construct Client in place on the heap — NOT via
+            // krpc::connect() which returns by value. The Client ctor
+            // captures `this` into StreamManager as a raw pointer, so a
+            // moved-from temporary leaves StreamManager holding a dangling
+            // pointer that SIGSEGVs on the first add_stream (libkrpc 0.5.4
+            // use-after-free inside services::KRPC(client).add_stream →
+            // add_exception_thrower). Direct RPCs survive it because
+            // invoke() never dereferences that raw pointer.
+            m_ksp_client = std::make_unique<krpc::Client>(
+                "ksp_bridge", "127.0.0.1", 50000, 50001);
 
             m_space_center = std::make_unique<krpc::services::SpaceCenter>(m_ksp_client.get());
             m_krpc = std::make_unique<krpc::services::KRPC>(m_ksp_client.get());
