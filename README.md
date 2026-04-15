@@ -76,6 +76,54 @@ rqt &
 ros2 run ksp_bridge_<your_custom_packet> <your_custom_launch_file>.launch.py
 ```
 
+## The `ksp_bridge` node
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `publish_rate_hz` | `double` | `10.0` | Rate of the fast group: `/vessel`, `/vessel/control`, `/vessel/flight`, `/vessel/orbit`, TF. |
+| `parts_publish_rate_hz` | `double` | `1.0` | Rate of `/vessel/parts`. Isolated because parts/resources iteration is O(parts × resources) per tick. |
+| `bodies_publish_rate_hz` | `double` | `1.0` | Rate of `/celestial_bodies` (mostly static physics constants). |
+| `celestial_bodies` | `string[]` | `["kerbin"]` | Bodies to publish on `/celestial_bodies`. `kerbin` is always added. |
+
+All three rates are validated: values `≤ 0` are rejected at startup, values `> 50 Hz` are warned but not clamped. 50 Hz is the kRPC physics-tick ceiling (Unity `FixedUpdate`, 25 Hz under load); polling faster yields duplicate samples from the same physics frame unless the in-game kRPC option *"Blocking receives"* is enabled.
+
+### Topics
+
+Published:
+
+- `/vessel` — `ksp_bridge_interfaces/Vessel`
+- `/vessel/control` — `ksp_bridge_interfaces/Control`
+- `/vessel/flight` — `ksp_bridge_interfaces/Flight`
+- `/vessel/orbit` — `ksp_bridge_interfaces/Orbit`
+- `/vessel/parts` — `ksp_bridge_interfaces/Parts`
+- `/celestial_bodies` — `ksp_bridge_interfaces/CelestialBodies`
+- TF broadcast of the active reference frame (`tf2_ros::TransformBroadcaster`).
+
+Subscribed:
+
+- `/cmd_throttle` — `ksp_bridge_interfaces/CmdThrottle`
+- `/cmd_rotation` — `ksp_bridge_interfaces/CmdRotation`
+
+Services:
+
+- `/next_stage` — `ksp_bridge_interfaces/srv/Activation`
+- `/set_sas` — `ksp_bridge_interfaces/srv/SAS`
+- `/set_reference_frame` — `ksp_bridge_interfaces/srv/String`
+
+### Architecture
+
+Three independent wall timers drive the fast / parts / bodies groups, so an expensive parts pass cannot starve `/vessel/flight` or the TF tree.
+
+The fast group uses the kRPC **streams API** (`krpc::Stream<T>`) rather than direct RPCs. On first tick after a vessel is found, `setup_fast_streams()` registers ~80 streams across vessel / flight / orbit scalar and vector properties and warms each one by reading it once — this guarantees the client-side stream thread has started before any subsequent `freeze_streams()` block. Each fast tick then:
+
+1. Gathers control data via direct RPC *outside* the frozen block. Control fields are enum-typed and the kRPC C++ decoder has no enum-stream overloads, so these still cost one RPC per tick.
+2. Calls `freeze_streams()` and reads vessel / flight / orbit fields so every field in one publish tick comes from a single physics frame (krpc#357). A RAII `ThawGuard` guarantees `thaw_streams()` on scope exit.
+3. Broadcasts TF (direct RPCs, outside the freeze block).
+
+Vessel-switch detection (stage separation, EVA, manual switch) is done via `active_vessel_stream` so the normal path is zero RPCs; the stream bundle is torn down and rebuilt only when the server reports a different vessel. If the game scene leaves `flight`, the vessel is invalidated and the streams are torn down; they are rebuilt automatically on the next valid tick.
+
 
 
 
