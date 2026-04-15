@@ -4,7 +4,7 @@
 #include <ksp_bridge_interfaces/msg/celestial_body.hpp>
 #include <ksp_bridge_interfaces/msg/resource.hpp>
 
-void KSPBridge::publish_data()
+void KSPBridge::publish_fast()
 {
     if (!is_valid_screen()) {
         return;
@@ -30,19 +30,43 @@ void KSPBridge::publish_data()
         m_flight_publisher->publish(m_flight_data);
     }
 
-    if (gather_parts_data()) {
-        m_parts_publisher->publish(m_parts_data);
-    }
-
-    if (gather_celestial_bodies_data(frame)) {
-        m_celestial_bodies_publisher->publish(m_celestial_bodies_data);
-    }
-
     if (gather_orbit_data()) {
         m_orbit_publisher->publish(m_orbit_data);
     }
 
     send_tf_tree(frame);
+}
+
+void KSPBridge::publish_parts()
+{
+    if (!is_valid_screen()) {
+        return;
+    }
+
+    validate_active_vessel();
+
+    if (gather_parts_data()) {
+        m_parts_publisher->publish(m_parts_data);
+    }
+}
+
+void KSPBridge::publish_bodies()
+{
+    if (!is_valid_screen()) {
+        return;
+    }
+
+    validate_active_vessel();
+
+    NamedReferenceFrame frame;
+    m_refrence_frame.lock.lock();
+    frame.name = m_refrence_frame.name;
+    frame.refrence_frame = m_refrence_frame.refrence_frame;
+    m_refrence_frame.lock.unlock();
+
+    if (gather_celestial_bodies_data(frame)) {
+        m_celestial_bodies_publisher->publish(m_celestial_bodies_data);
+    }
 }
 
 bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)

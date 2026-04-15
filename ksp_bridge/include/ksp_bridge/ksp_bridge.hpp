@@ -58,7 +58,9 @@ private:
 
     std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
 
-    rclcpp::TimerBase::SharedPtr m_publish_timer;
+    rclcpp::TimerBase::SharedPtr m_fast_timer;
+    rclcpp::TimerBase::SharedPtr m_parts_timer;
+    rclcpp::TimerBase::SharedPtr m_bodies_timer;
 
     ksp_bridge_interfaces::msg::Vessel m_vessel_data;
     ksp_bridge_interfaces::msg::Control m_control_data;
@@ -76,7 +78,9 @@ private:
 
     void send_tf_tree(NamedReferenceFrame& frame);
 
-    void publish_data();
+    void publish_fast();
+    void publish_parts();
+    void publish_bodies();
 
     // subscribers
     rclcpp::Subscription<ksp_bridge_interfaces::msg::CmdThrottle>::SharedPtr m_cmd_throttle_sub;

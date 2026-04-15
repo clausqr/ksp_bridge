@@ -9,31 +9,42 @@ KSPBridge::KSPBridge()
     : rclcpp::Node("ksp_bridge")
 {
     declare_parameter<double>("publish_rate_hz", 10.0);
+    declare_parameter<double>("parts_publish_rate_hz", 1.0);
+    declare_parameter<double>("bodies_publish_rate_hz", 1.0);
     declare_parameter<std::vector<std::string>>("celestial_bodies", {"kerbin"});
 
-    double publish_rate_hz = get_parameter("publish_rate_hz").as_double();
+    double fast_rate_hz = get_parameter("publish_rate_hz").as_double();
+    double parts_rate_hz = get_parameter("parts_publish_rate_hz").as_double();
+    double bodies_rate_hz = get_parameter("bodies_publish_rate_hz").as_double();
     m_param_celestial_bodies = get_parameter("celestial_bodies").as_string_array();
 
-    if (publish_rate_hz <= 0.0) {
-        RCLCPP_FATAL(get_logger(), "publish_rate_hz must be > 0, got %f", publish_rate_hz);
-        throw std::invalid_argument("publish_rate_hz must be > 0");
-    }
-    if (publish_rate_hz > 50.0) {
-        RCLCPP_WARN_ONCE(get_logger(),
-            "publish_rate_hz=%f exceeds kRPC's ~50 Hz physics-tick ceiling; "
-            "values above the in-game Physics.fixedDeltaTime rate will yield duplicate "
-            "samples from the same physics frame. See the kRPC server window "
-            "(\"Max time per update\" and \"Blocking receives\") if this is intentional.",
-            publish_rate_hz);
-    }
+    auto validated_period = [this](const char* name, double rate_hz) {
+        if (rate_hz <= 0.0) {
+            RCLCPP_FATAL(get_logger(), "%s must be > 0, got %f", name, rate_hz);
+            throw std::invalid_argument(std::string(name) + " must be > 0");
+        }
+        if (rate_hz > 50.0) {
+            RCLCPP_WARN_ONCE(get_logger(),
+                "%s=%f exceeds kRPC's ~50 Hz physics-tick ceiling; "
+                "values above the in-game Physics.fixedDeltaTime rate will yield duplicate "
+                "samples from the same physics frame. See the kRPC server window "
+                "(\"Max time per update\" and \"Blocking receives\") if this is intentional.",
+                name, rate_hz);
+        }
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::duration<double>(1.0 / rate_hz));
+    };
+
+    auto fast_period = validated_period("publish_rate_hz", fast_rate_hz);
+    auto parts_period = validated_period("parts_publish_rate_hz", parts_rate_hz);
+    auto bodies_period = validated_period("bodies_publish_rate_hz", bodies_rate_hz);
 
     connect();
     find_active_vessel();
 
-    auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::duration<double>(1.0 / publish_rate_hz));
-    m_publish_timer = create_wall_timer(period,
-        std::bind(&KSPBridge::publish_data, this));
+    m_fast_timer = create_wall_timer(fast_period, std::bind(&KSPBridge::publish_fast, this));
+    m_parts_timer = create_wall_timer(parts_period, std::bind(&KSPBridge::publish_parts, this));
+    m_bodies_timer = create_wall_timer(bodies_period, std::bind(&KSPBridge::publish_bodies, this));
 }
 
 void KSPBridge::connect()
