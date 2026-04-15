@@ -131,7 +131,11 @@ private:
         krpc::Stream<double> orbit_true_anomaly;
         krpc::Stream<double> orbit_orbital_speed;
         krpc::Stream<double> orbit_time_to_soi_change;
-        // orbit SOI body name cached at setup; refreshed on invalidate/frame change
+        // SOI body streamed so SOI transitions can be detected; the cached
+        // name is refreshed (via a single direct RPC) only when the body
+        // handle actually changes.
+        krpc::Stream<krpc::services::SpaceCenter::CelestialBody> orbit_body;
+        krpc::services::SpaceCenter::CelestialBody orbit_body_cached;
         std::string orbit_body_name;
     };
 

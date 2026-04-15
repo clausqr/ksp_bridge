@@ -123,7 +123,9 @@ void KSPBridge::setup_fast_streams(NamedReferenceFrame& frame)
         auto flight = m_vessel->flight(frame.refrence_frame);
         auto orbit = m_vessel->orbit();
 
-        b->orbit_body_name = orbit.body().name();
+        b->orbit_body = orbit.body_stream();
+        b->orbit_body_cached = orbit.body();
+        b->orbit_body_name = b->orbit_body_cached.name();
 
         b->vessel_name = m_vessel->name_stream();
         b->vessel_type = m_vessel->type_stream();
@@ -210,13 +212,102 @@ void KSPBridge::setup_fast_streams(NamedReferenceFrame& frame)
         b->orbit_true_anomaly = orbit.true_anomaly_stream();
         b->orbit_orbital_speed = orbit.orbital_speed_stream();
         b->orbit_time_to_soi_change = orbit.time_to_soi_change_stream();
+
+        // Warmup: force each stream to start() and receive its first value.
+        // operator() lazily calls start() and waits on the update thread's
+        // condition variable; doing this now (outside any freeze_streams
+        // block) guarantees subsequent reads inside freeze/thaw won't
+        // deadlock on an unstarted stream.
+        (void)b->vessel_name();
+        (void)b->vessel_type();
+        (void)b->vessel_situation();
+        (void)b->vessel_recoverable();
+        (void)b->vessel_met();
+        (void)b->vessel_biome();
+        (void)b->vessel_crew_capacity();
+        (void)b->vessel_crew_count();
+        (void)b->vessel_mass();
+        (void)b->vessel_dry_mass();
+        (void)b->vessel_thrust();
+        (void)b->vessel_available_thrust();
+        (void)b->vessel_max_thrust();
+        (void)b->vessel_max_vacuum_thrust();
+        (void)b->vessel_specific_impulse();
+        (void)b->vessel_vacuum_specific_impulse();
+        (void)b->vessel_kerbin_sea_level_specific_impulse();
+        (void)b->vessel_moment_of_inertia();
+        (void)b->vessel_inertia_tensor();
+        (void)b->vessel_position();
+        (void)b->vessel_velocity();
+        (void)b->vessel_rotation();
+        (void)b->vessel_direction();
+        (void)b->vessel_angular_velocity();
+        (void)b->flight_g_force();
+        (void)b->flight_mean_altitude();
+        (void)b->flight_surface_altitude();
+        (void)b->flight_bedrock_altitude();
+        (void)b->flight_velocity();
+        (void)b->flight_speed();
+        (void)b->flight_horizontal_speed();
+        (void)b->flight_vertical_speed();
+        (void)b->flight_center_of_mass();
+        (void)b->flight_rotation();
+        (void)b->flight_direction();
+        (void)b->flight_pitch();
+        (void)b->flight_heading();
+        (void)b->flight_roll();
+        (void)b->flight_prograde();
+        (void)b->flight_retrograde();
+        (void)b->flight_normal();
+        (void)b->flight_anti_normal();
+        (void)b->flight_radial();
+        (void)b->flight_anti_radial();
+        (void)b->flight_atmosphere_density();
+        (void)b->flight_dynamic_pressure();
+        (void)b->flight_static_pressure();
+        (void)b->flight_static_pressure_at_msl();
+        (void)b->flight_aerodynamic_force();
+        (void)b->flight_lift();
+        (void)b->flight_drag();
+        (void)b->flight_speed_of_sound();
+        (void)b->flight_mach();
+        (void)b->flight_true_air_speed();
+        (void)b->flight_equivalent_air_speed();
+        (void)b->flight_terminal_velocity();
+        (void)b->flight_angle_of_attack();
+        (void)b->flight_sideslip_angle();
+        (void)b->flight_total_air_temperature();
+        (void)b->flight_static_air_temperature();
+        (void)b->orbit_apoapsis();
+        (void)b->orbit_periapsis();
+        (void)b->orbit_apoapsis_altitude();
+        (void)b->orbit_periapsis_altitude();
+        (void)b->orbit_semi_major_axis();
+        (void)b->orbit_semi_minor_axis();
+        (void)b->orbit_radius();
+        (void)b->orbit_speed();
+        (void)b->orbit_period();
+        (void)b->orbit_time_to_apoapsis();
+        (void)b->orbit_time_to_periapsis();
+        (void)b->orbit_eccentricity();
+        (void)b->orbit_inclination();
+        (void)b->orbit_longitude_of_ascending_node();
+        (void)b->orbit_argument_of_periapsis();
+        (void)b->orbit_mean_anomaly_at_epoch();
+        (void)b->orbit_epoch();
+        (void)b->orbit_mean_anomaly();
+        (void)b->orbit_eccentric_anomaly();
+        (void)b->orbit_true_anomaly();
+        (void)b->orbit_orbital_speed();
+        (void)b->orbit_time_to_soi_change();
+        (void)b->orbit_body();
     } catch (const std::exception& ex) {
         RCLCPP_ERROR(get_logger(), "setup_fast_streams failed: %s", ex.what());
         return;
     }
 
     m_fast_streams = std::move(b);
-    RCLCPP_INFO(get_logger(), "Fast-group kRPC streams registered.");
+    RCLCPP_INFO(get_logger(), "Fast-group kRPC streams registered and warmed up.");
 }
 
 void KSPBridge::find_active_vessel()

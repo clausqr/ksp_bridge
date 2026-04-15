@@ -25,27 +25,34 @@ void KSPBridge::publish_fast()
         }
     }
 
-    // TODO: wrap the four gather_* calls in freeze_streams/thaw_streams
-    // once we've verified that all streams in FastStreams are started
-    // (warmed up) during setup_fast_streams. Freezing while a stream
-    // hasn't received its first value will deadlock because operator()
-    // auto-starts it and waits on a condition variable gated by the
-    // frozen update thread.
+    // Pin stream values to one physics frame so fields read in the same
+    // tick are mutually consistent. Safe because setup_fast_streams warmed
+    // up every stream, so no operator() will need to start() and block on
+    // the frozen update thread. tf_tree stays outside since it makes direct
+    // RPCs.
+    {
+        struct ThawGuard {
+            krpc::Client* client;
+            ~ThawGuard() { if (client) client->thaw_streams(); }
+        };
+        m_ksp_client->freeze_streams();
+        ThawGuard thaw_guard { m_ksp_client.get() };
 
-    if (gather_vessel_data(frame)) {
-        m_vessel_publisher->publish(m_vessel_data);
-    }
+        if (gather_vessel_data(frame)) {
+            m_vessel_publisher->publish(m_vessel_data);
+        }
 
-    if (gather_control_data(frame)) {
-        m_control_publisher->publish(m_control_data);
-    }
+        if (gather_control_data(frame)) {
+            m_control_publisher->publish(m_control_data);
+        }
 
-    if (gather_flight_data(frame)) {
-        m_flight_publisher->publish(m_flight_data);
-    }
+        if (gather_flight_data(frame)) {
+            m_flight_publisher->publish(m_flight_data);
+        }
 
-    if (gather_orbit_data()) {
-        m_orbit_publisher->publish(m_orbit_data);
+        if (gather_orbit_data()) {
+            m_orbit_publisher->publish(m_orbit_data);
+        }
     }
 
     send_tf_tree(frame);
@@ -405,9 +412,13 @@ bool KSPBridge::gather_orbit_data()
     try {
         auto& s = *m_fast_streams;
 
-        // orbit_body_name is cached at setup_fast_streams time; a SOI
-        // transition will show the stale value until the next bundle rebuild
-        // (invalidate or frame change).
+        // Detect SOI transition by comparing streamed body handle to the
+        // cached one; only then pay one direct RPC for the new name.
+        auto current_body = s.orbit_body();
+        if (!(current_body == s.orbit_body_cached)) {
+            s.orbit_body_cached = current_body;
+            s.orbit_body_name = current_body.name();
+        }
         m_orbit_data.body = s.orbit_body_name;
         m_orbit_data.apoapsis = s.orbit_apoapsis();
         m_orbit_data.periapsis = s.orbit_periapsis();
