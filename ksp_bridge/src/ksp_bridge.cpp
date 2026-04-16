@@ -84,6 +84,10 @@ void KSPBridge::connect()
         rclcpp::sleep_for(std::chrono::seconds(1));
     }
 
+    if (!m_krpc) {
+        return;
+    }
+
     RCLCPP_INFO(get_logger(), "Connected to kRPC server v%s", m_krpc->get_status().version().c_str());
 }
 
@@ -456,6 +460,10 @@ void KSPBridge::find_active_vessel()
             RCLCPP_INFO(get_logger(), "Searching active vessel ...");
         }
         rclcpp::sleep_for(std::chrono::seconds(1));
+    }
+
+    if (!m_vessel) {
+        return;
     }
 
     // Register the streamed handle so subsequent validate_active_vessel()
