@@ -45,3 +45,8 @@ geometry_msgs/Vector3 velocity
 geometry_msgs/Quaternion rotation
 geometry_msgs/Vector3 direction
 geometry_msgs/Vector3 angular_velocity
+# Body-frame angular velocity (p, q, r). Computed server-side via
+# transform_direction from body.non_rotating_reference_frame to
+# vessel.reference_frame — avoids client-side quaternion composition
+# that's skewed by cross-stream sampling.
+geometry_msgs/Vector3 angular_velocity_body

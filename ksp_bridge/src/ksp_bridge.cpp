@@ -42,6 +42,13 @@ KSPBridge::KSPBridge()
     connect();
     find_active_vessel();
 
+    // SIGINT during the connect/find retry loops calls rcl_shutdown(). Creating
+    // timers below would then throw "context is not valid" and terminate the
+    // process. Bail out cleanly instead and let main's spin() return.
+    if (!rclcpp::ok()) {
+        return;
+    }
+
     m_fast_timer = create_wall_timer(fast_period, std::bind(&KSPBridge::publish_fast, this));
     m_parts_timer = create_wall_timer(parts_period, std::bind(&KSPBridge::publish_parts, this));
     m_bodies_timer = create_wall_timer(bodies_period, std::bind(&KSPBridge::publish_bodies, this));
@@ -188,6 +195,7 @@ void KSPBridge::teardown_fast_streams()
     safe_remove(b.vessel_rotation);
     safe_remove(b.vessel_direction);
     safe_remove(b.vessel_angular_velocity);
+    safe_remove(b.vessel_angular_velocity_body_nonrot);
 
     safe_remove(b.flight_g_force);
     safe_remove(b.flight_mean_altitude);
@@ -291,6 +299,9 @@ void KSPBridge::setup_fast_streams(NamedReferenceFrame& frame)
         b->vessel_rotation = m_vessel->rotation_stream(frame.refrence_frame);
         b->vessel_direction = m_vessel->direction_stream(frame.refrence_frame);
         b->vessel_angular_velocity = m_vessel->angular_velocity_stream(frame.refrence_frame);
+        b->body_non_rotating_rf = m_vessel->orbit().body().non_rotating_reference_frame();
+        b->vessel_rf = m_vessel->reference_frame();
+        b->vessel_angular_velocity_body_nonrot = m_vessel->angular_velocity_stream(b->body_non_rotating_rf);
 
         b->flight_g_force = flight.g_force_stream();
         b->flight_mean_altitude = flight.mean_altitude_stream();
@@ -379,6 +390,7 @@ void KSPBridge::setup_fast_streams(NamedReferenceFrame& frame)
         (void)b->vessel_rotation();
         (void)b->vessel_direction();
         (void)b->vessel_angular_velocity();
+        (void)b->vessel_angular_velocity_body_nonrot();
         (void)b->flight_g_force();
         (void)b->flight_mean_altitude();
         (void)b->flight_surface_altitude();

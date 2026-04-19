@@ -157,6 +157,14 @@ bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
         m_vessel_data.rotation = tuple2quaternion(s.vessel_rotation());
         m_vessel_data.direction = tuple2vector3(s.vessel_direction());
         m_vessel_data.angular_velocity = tuple2vector3(s.vessel_angular_velocity());
+        // Body-frame ω via kRPC's canonical recipe: streamed ω in the SOI
+        // body's inertial frame, then a single server-side transform into
+        // the vessel frame. One sync RPC per tick, no cross-stream skew.
+        m_vessel_data.angular_velocity_body = tuple2vector3(
+            m_space_center->transform_direction(
+                s.vessel_angular_velocity_body_nonrot(),
+                s.body_non_rotating_rf,
+                s.vessel_rf));
     } catch (const std::exception& ex) {
         RCLCPP_ERROR(get_logger(), "%s:%d: %s", base_name(__FILE__), __LINE__, ex.what());
         invalidate_active_vessel();

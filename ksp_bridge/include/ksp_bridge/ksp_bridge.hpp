@@ -71,6 +71,18 @@ private:
         krpc::Stream<std::tuple<double, double, double, double>> vessel_rotation;
         krpc::Stream<std::tuple<double, double, double>> vessel_direction;
         krpc::Stream<std::tuple<double, double, double>> vessel_angular_velocity;
+        // Angular velocity in the current SOI body's non-rotating (inertial)
+        // reference frame. Each tick we transform this to the vessel frame
+        // server-side via SpaceCenter::transform_direction — the canonical
+        // kRPC recipe for body-frame (p, q, r), which avoids client-side
+        // quaternion composition with a separately-sampled rotation stream.
+        krpc::Stream<std::tuple<double, double, double>> vessel_angular_velocity_body_nonrot;
+        // Cached frames captured when streams are set up. body_non_rotating_rf
+        // is the SOI body's inertial frame at setup time; SOI transitions
+        // are not tracked here — they're rare for the astrolander use case,
+        // and a vessel-change tear-down would refresh both frames anyway.
+        krpc::services::SpaceCenter::ReferenceFrame body_non_rotating_rf;
+        krpc::services::SpaceCenter::ReferenceFrame vessel_rf;
         // flight (entire Flight object is frame-bound via vessel.flight(rf))
         krpc::Stream<float> flight_g_force;
         krpc::Stream<double> flight_mean_altitude;
