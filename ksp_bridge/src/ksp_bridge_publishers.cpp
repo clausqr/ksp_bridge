@@ -131,7 +131,9 @@ bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
         m_vessel_data.vacuum_specific_impulse = s.vessel_vacuum_specific_impulse();
         m_vessel_data.kerbin_sea_level_specific_impulse = s.vessel_kerbin_sea_level_specific_impulse();
 
-        m_vessel_data.moment_of_inertia = tuple2vector3(s.vessel_moment_of_inertia());
+        // moment_of_inertia is the principal-axis diagonal in the vessel
+        // body frame → transform into FRD so I.x=roll, I.y=pitch, I.z=yaw.
+        m_vessel_data.moment_of_inertia = vessel_frd_vector(tuple2vector3(s.vessel_moment_of_inertia()));
 
         auto position = s.vessel_position();
         auto inertia = s.vessel_inertia_tensor();
@@ -139,12 +141,15 @@ bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
         m_vessel_data.inertia.m = mass;
         m_vessel_data.inertia.com = tuple2vector3(position);
         if (inertia.size() >= 6) {
-            // TODO: check this
-            m_vessel_data.inertia.ixx = inertia[0];
+            // inertia_tensor is a 3x3 symmetric tensor in the vessel body
+            // frame, flattened to (ixx, ixy, ixz, iyy, iyz, izz). Under the
+            // x<->y basis swap, diagonals (xx, yy) swap and cross terms
+            // (xz, yz) swap; xy and zz are invariant.
+            m_vessel_data.inertia.ixx = inertia[3];
             m_vessel_data.inertia.ixy = inertia[1];
-            m_vessel_data.inertia.ixz = inertia[2];
-            m_vessel_data.inertia.iyy = inertia[3];
-            m_vessel_data.inertia.iyz = inertia[4];
+            m_vessel_data.inertia.ixz = inertia[4];
+            m_vessel_data.inertia.iyy = inertia[0];
+            m_vessel_data.inertia.iyz = inertia[2];
             m_vessel_data.inertia.izz = inertia[5];
         } else {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
@@ -152,19 +157,23 @@ bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
                 inertia.size());
         }
 
+        // position, velocity, direction, angular_velocity are expressed in
+        // the active reference frame (kerbin by default). They stay in
+        // kRPC's native left-handed frame — FRD only applies to body-frame
+        // quantities. See README "Frame conventions".
         m_vessel_data.position = tuple2vector3(position);
         m_vessel_data.velocity = tuple2vector3(s.vessel_velocity());
-        m_vessel_data.rotation = tuple2quaternion(s.vessel_rotation());
+        m_vessel_data.rotation = vessel_frd_quaternion(tuple2quaternion(s.vessel_rotation()));
         m_vessel_data.direction = tuple2vector3(s.vessel_direction());
         m_vessel_data.angular_velocity = tuple2vector3(s.vessel_angular_velocity());
         // Body-frame ω via kRPC's canonical recipe: streamed ω in the SOI
         // body's inertial frame, then a single server-side transform into
         // the vessel frame. One sync RPC per tick, no cross-stream skew.
-        m_vessel_data.angular_velocity_body = tuple2vector3(
+        m_vessel_data.angular_velocity_body = vessel_frd_vector(tuple2vector3(
             m_space_center->transform_direction(
                 s.vessel_angular_velocity_body_nonrot(),
                 s.body_non_rotating_rf,
-                s.vessel_rf));
+                s.vessel_rf)));
     } catch (const std::exception& ex) {
         RCLCPP_ERROR(get_logger(), "%s:%d: %s", base_name(__FILE__), __LINE__, ex.what());
         invalidate_active_vessel();

@@ -2,6 +2,12 @@
 
 ROS2 package for Kerbal Space Program based on the kRPC mod.
 
+> **v0.x → v1.0 breaking change.** Vessel-body-frame quantities on `/vessel`
+> are now published in aerospace FRD (`x=forward`, `y=right`, `z=down`,
+> right-handed). KSP's native vessel frame (`x=right`, `y=forward`, `z=down`,
+> left-handed) is no longer exposed. See "Frame conventions" below for the
+> per-field contract.
+
 Works with:  
 
 + KSP 1.12.5
@@ -111,6 +117,32 @@ Services:
 - `/next_stage` — `ksp_bridge_interfaces/srv/Activation`
 - `/set_sas` — `ksp_bridge_interfaces/srv/SAS`
 - `/set_reference_frame` — `ksp_bridge_interfaces/srv/String`
+
+### Frame conventions
+
+`ksp_bridge` is the boundary between KSP's native frames and ROS-side aerospace conventions. Two frames matter:
+
+- **KSP vessel frame** (kRPC `Vessel.reference_frame`): left-handed, `x=right`, `y=forward`, `z=down`.
+- **Aerospace FRD body frame**: right-handed, `x=forward`, `y=right`, `z=down`.
+
+Transformed on publish (consumed downstream as FRD):
+
+| Field | Kind | Transform |
+|---|---|---|
+| `/vessel.moment_of_inertia` | Vector3, body principal-axis diagonal | `(y, x, z)` permute — `x=I_roll, y=I_pitch, z=I_yaw` |
+| `/vessel.inertia` (full tensor) | 6 floats, body frame | `ixx<->iyy`, `ixz<->iyz` (xy, zz invariant) |
+| `/vessel.rotation` | Quaternion | `(x, y, z, w) → (y, x, z, -w)` |
+| `/vessel.angular_velocity_body` | Vector3, body frame | `(y, x, z)` permute |
+
+Published as-is in the **active reference frame** (kerbin celestial-body frame by default, LH KSP-native):
+
+- `/vessel.position`, `/vessel.velocity`, `/vessel.direction`, `/vessel.angular_velocity`
+- All fields on `/vessel/flight` and `/vessel/orbit`
+- All fields on `/celestial_bodies`
+
+Control scalars (`/vessel/control.pitch`, `.yaw`, `.roll`, and the `/set_sas` service) are named-axis scalars, not vector components — they are passed through unchanged and already match aerospace sign conventions (nose-up = +pitch, nose-right = +yaw, right-roll = +roll per kRPC).
+
+**Still on the TODO list** (not part of this release): FRD conversion for body-frame quantities on `/vessel/parts` (part positions, rotations, inertia). Subscribe to this topic at your own risk if you rely on FRD; for now it is still KSP-native LH. Track via the ksp_bridge project for upcoming work packages.
 
 ### Architecture
 

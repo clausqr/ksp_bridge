@@ -38,15 +38,25 @@ float32 max_vacuum_thrust
 float32 specific_impulse
 float32 vacuum_specific_impulse
 float32 kerbin_sea_level_specific_impulse
+# Principal-axis diagonal in aerospace FRD body frame:
+# x=roll (I_xx), y=pitch (I_yy), z=yaw (I_zz).
 geometry_msgs/Vector3 moment_of_inertia
-geometry_msgs/Inertia inertia       # from inertia_tensor
+# Full inertia tensor in aerospace FRD body frame (from inertia_tensor,
+# permuted from KSP vessel frame).
+geometry_msgs/Inertia inertia
+# position, velocity, direction, angular_velocity are in the active
+# reference frame (kerbin celestial-body frame by default), which is
+# KSP-native left-handed. FRD conversion only applies to body-frame
+# quantities; see README "Frame conventions".
 geometry_msgs/Vector3 position
 geometry_msgs/Vector3 velocity
+# Rotation from the active reference frame into the vessel FRD body
+# frame. Permuted + w-flipped from kRPC's native quaternion.
 geometry_msgs/Quaternion rotation
 geometry_msgs/Vector3 direction
 geometry_msgs/Vector3 angular_velocity
-# Body-frame angular velocity (p, q, r). Computed server-side via
+# Body-frame angular velocity (p, q, r) in aerospace FRD:
+# x=roll rate, y=pitch rate, z=yaw rate. Computed server-side via
 # transform_direction from body.non_rotating_reference_frame to
-# vessel.reference_frame — avoids client-side quaternion composition
-# that's skewed by cross-stream sampling.
+# vessel.reference_frame, then permuted to FRD.
 geometry_msgs/Vector3 angular_velocity_body
