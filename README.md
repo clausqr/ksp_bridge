@@ -132,7 +132,7 @@ Transformed on publish (consumed downstream as FRD):
 | `/vessel.moment_of_inertia` | Vector3, body principal-axis diagonal | `(y, x, z)` permute — `x=I_roll, y=I_pitch, z=I_yaw` |
 | `/vessel.inertia` (full tensor) | 6 floats, body frame | `ixx<->iyy`, `ixz<->iyz` (xy, zz invariant) |
 | `/vessel.rotation` | Quaternion | `(x, y, z, w) → (y, x, z, -w)` |
-| `/vessel.angular_velocity_body` | Vector3, body frame | `(y, x, z)` permute |
+| `/vessel.angular_velocity_body` | Vector3 pseudo-vector, body frame | `(-y, -x, -z)` permute-and-negate (pseudo-vector sign flip: `det(P) = -1`) — verified W → −q, D → +r, Q → −p |
 
 Published as-is in the **active reference frame** (kerbin celestial-body frame by default, LH KSP-native):
 

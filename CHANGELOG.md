@@ -12,7 +12,12 @@
   - `moment_of_inertia` — `(y, x, z)` permute (`x=roll`, `y=pitch`, `z=yaw`).
   - `inertia` tensor — `ixx<->iyy`, `ixz<->iyz` (xy, zz invariant).
   - `rotation` — `(x, y, z, w) → (y, x, z, -w)`.
-  - `angular_velocity_body` — `(y, x, z)` permute.
+  - `angular_velocity_body` — `(-y, -x, -z)` permute-and-negate. The KSP-LH
+    to FRD basis change has `det(P) = -1`, so pseudo-vectors pick up an extra
+    global sign flip on top of the permutation (`ω' = det(P)·P·ω`). Live-
+    verified against isolated W/D/Q keypresses: W (pitch-down) → −q, D (yaw-
+    right) → +r, Q (roll-left) → −p, matching the aerospace FRD convention
+    (+p = right-wing down, +q = nose up, +r = nose right).
 
   Fields in the active reference frame (kerbin celestial-body frame by
   default) stay in kRPC's native left-handed frame:
