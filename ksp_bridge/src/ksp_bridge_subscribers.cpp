@@ -9,6 +9,9 @@ void KSPBridge::cmd_throttle_sub(const ksp_bridge_interfaces::msg::CmdThrottle::
 
     float value = clamp<float>(msg->throttle, 0, 1);
 
+    if (!m_vessel) {
+        return;
+    }
     try {
         m_vessel->control().set_throttle(value);
     } catch (const std::exception& ex) {
@@ -18,6 +21,10 @@ void KSPBridge::cmd_throttle_sub(const ksp_bridge_interfaces::msg::CmdThrottle::
 
 void KSPBridge::cmd_rotation_sub(const ksp_bridge_interfaces::msg::CmdRotation::SharedPtr msg)
 {
+    if (!m_vessel) {
+        return;
+    }
+
     if (msg->pitch > 1 || msg->pitch < -1) {
         RCLCPP_WARN(get_logger(), "Pitch must be between -1 and 1, current value is %f, will be clamped.", msg->pitch);
     }

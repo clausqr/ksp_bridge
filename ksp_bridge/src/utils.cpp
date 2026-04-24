@@ -53,6 +53,44 @@ geometry_msgs::msg::Quaternion tuple2quaternion(const std::tuple<double, double,
     return q;
 }
 
+geometry_msgs::msg::Vector3 vessel_frd_vector(const geometry_msgs::msg::Vector3& v)
+{
+    // Swap x (KSP right) and y (KSP forward); z (down) already matches FRD.
+    geometry_msgs::msg::Vector3 out;
+    out.x = v.y;
+    out.y = v.x;
+    out.z = v.z;
+    return out;
+}
+
+geometry_msgs::msg::Vector3 vessel_frd_pseudo_vector(const geometry_msgs::msg::Vector3& v)
+{
+    // The x<->y basis swap has det(P) = -1 (orientation-reversing), so a
+    // pseudo-vector (angular velocity, torque, magnetic field) transforms as
+    // w' = det(P) P w — i.e. the component permutation *and* a global sign
+    // flip. Empirically verified with a W/D/Q keyboard-nudge test: without
+    // the sign flip, pitch/yaw/roll rates come out inverted relative to the
+    // aerospace FRD convention.
+    geometry_msgs::msg::Vector3 out;
+    out.x = -v.y;
+    out.y = -v.x;
+    out.z = -v.z;
+    return out;
+}
+
+geometry_msgs::msg::Quaternion vessel_frd_quaternion(const geometry_msgs::msg::Quaternion& q)
+{
+    // Conjugation of the rotation matrix by the x<->y swap (which changes
+    // handedness) yields this component permutation plus a w-sign flip.
+    // Sign verified empirically — see frd-convention-boundary commit notes.
+    geometry_msgs::msg::Quaternion out;
+    out.x = q.y;
+    out.y = q.x;
+    out.z = q.z;
+    out.w = -q.w;
+    return out;
+}
+
 // TODO: verify this
 geometry_msgs::msg::TransformStamped get_transform(krpc::services::SpaceCenter& ss, std::tuple<double, double, double> position, std::tuple<double, double, double, double> rotation, krpc::services::SpaceCenter::ReferenceFrame from, krpc::services::SpaceCenter::ReferenceFrame to)
 {
