@@ -12,11 +12,13 @@ KSPBridge::KSPBridge()
     declare_parameter<double>("parts_publish_rate_hz", 1.0);
     declare_parameter<double>("bodies_publish_rate_hz", 1.0);
     declare_parameter<std::vector<std::string>>("celestial_bodies", {"kerbin"});
+    declare_parameter<std::string>("control_input_mode", "override");
 
     double fast_rate_hz = get_parameter("publish_rate_hz").as_double();
     double parts_rate_hz = get_parameter("parts_publish_rate_hz").as_double();
     double bodies_rate_hz = get_parameter("bodies_publish_rate_hz").as_double();
     m_param_celestial_bodies = get_parameter("celestial_bodies").as_string_array();
+    m_param_control_input_mode = get_parameter("control_input_mode").as_string();
 
     auto validated_period = [this](const char* name, double rate_hz) {
         if (rate_hz <= 0.0) {
@@ -464,8 +466,20 @@ void KSPBridge::find_active_vessel()
     while (rclcpp::ok()) {
         try {
             m_vessel = std::make_unique<krpc::services::SpaceCenter::Vessel>(m_space_center->active_vessel());
-            m_vessel->control().set_input_mode(krpc::services::SpaceCenter::ControlInputMode::override);
-            RCLCPP_INFO(get_logger(), "Vessel found: '%s'", m_vessel->name().c_str());
+            if (m_param_control_input_mode == "override") {
+                m_vessel->control().set_input_mode(krpc::services::SpaceCenter::ControlInputMode::override);
+            } else if (m_param_control_input_mode == "additive") {
+                m_vessel->control().set_input_mode(krpc::services::SpaceCenter::ControlInputMode::additive);
+            } else if (m_param_control_input_mode == "off") {
+                // leave whatever the game/player set
+            } else {
+                RCLCPP_WARN(get_logger(),
+                    "Unknown control_input_mode '%s'; falling back to 'override'. Valid: override|additive|off.",
+                    m_param_control_input_mode.c_str());
+                m_vessel->control().set_input_mode(krpc::services::SpaceCenter::ControlInputMode::override);
+            }
+            RCLCPP_INFO(get_logger(), "Vessel found: '%s' (control_input_mode=%s)",
+                m_vessel->name().c_str(), m_param_control_input_mode.c_str());
             break;
         } catch (...) {
             m_vessel = nullptr;

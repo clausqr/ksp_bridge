@@ -164,6 +164,7 @@ private:
     std::unique_ptr<krpc::services::KRPC> m_krpc;
     std::unique_ptr<krpc::services::SpaceCenter> m_space_center;
     std::vector<std::string> m_param_celestial_bodies;
+    std::string m_param_control_input_mode;
     std::unique_ptr<krpc::services::SpaceCenter::Vessel> m_vessel;
     NamedReferenceFrame m_refrence_frame;
     std::map<std::string, krpc::services::SpaceCenter::CelestialBody> m_celestial_bodies;
