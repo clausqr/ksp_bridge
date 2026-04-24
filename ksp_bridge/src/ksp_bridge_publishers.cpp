@@ -169,7 +169,7 @@ bool KSPBridge::gather_vessel_data(NamedReferenceFrame& frame)
         // Body-frame ω via kRPC's canonical recipe: streamed ω in the SOI
         // body's inertial frame, then a single server-side transform into
         // the vessel frame. One sync RPC per tick, no cross-stream skew.
-        m_vessel_data.angular_velocity_body = vessel_frd_vector(tuple2vector3(
+        m_vessel_data.angular_velocity_body = vessel_frd_pseudo_vector(tuple2vector3(
             m_space_center->transform_direction(
                 s.vessel_angular_velocity_body_nonrot(),
                 s.body_non_rotating_rf,

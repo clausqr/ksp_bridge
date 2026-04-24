@@ -63,6 +63,21 @@ geometry_msgs::msg::Vector3 vessel_frd_vector(const geometry_msgs::msg::Vector3&
     return out;
 }
 
+geometry_msgs::msg::Vector3 vessel_frd_pseudo_vector(const geometry_msgs::msg::Vector3& v)
+{
+    // The x<->y basis swap has det(P) = -1 (orientation-reversing), so a
+    // pseudo-vector (angular velocity, torque, magnetic field) transforms as
+    // w' = det(P) P w — i.e. the component permutation *and* a global sign
+    // flip. Empirically verified with a W/D/Q keyboard-nudge test: without
+    // the sign flip, pitch/yaw/roll rates come out inverted relative to the
+    // aerospace FRD convention.
+    geometry_msgs::msg::Vector3 out;
+    out.x = -v.y;
+    out.y = -v.x;
+    out.z = -v.z;
+    return out;
+}
+
 geometry_msgs::msg::Quaternion vessel_frd_quaternion(const geometry_msgs::msg::Quaternion& q)
 {
     // Conjugation of the rotation matrix by the x<->y swap (which changes
