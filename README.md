@@ -156,7 +156,32 @@ The fast group uses the kRPC **streams API** (`krpc::Stream<T>`) rather than dir
 
 Vessel-switch detection (stage separation, EVA, manual switch) is done via `active_vessel_stream` so the normal path is zero RPCs; the stream bundle is torn down and rebuilt only when the server reports a different vessel. If the game scene leaves `flight`, the vessel is invalidated and the streams are torn down; they are rebuilt automatically on the next valid tick.
 
+## Contributing
 
+This repository uses a **gitflow** branching model:
 
+- `main` — release branch. Tagged versions ship from here. Never commit directly.
+- `develop` — integration branch. All feature work merges here first.
+- `feature/<slug>` — one branch per feature or work package, branched from `develop`, PR'd back to `develop`.
+- `fix/<slug>` — same pattern for non-release bug fixes.
+- `release/<version>` — short-lived branch cut from `develop` when stabilising a release; merges into both `main` and `develop`.
+- `hotfix/<slug>` — branched from `main`, merges into both `main` and `develop`.
 
+**Workflow:**
+
+```bash
+git switch develop && git pull
+git switch -c feature/my-thing
+# ... work, commit ...
+git push -u origin feature/my-thing
+gh pr create --base develop
+```
+
+For parallel work on multiple features, use git worktrees so each branch has its own checkout:
+
+```bash
+git worktree add ../ksp_bridge.wt/my-thing feature/my-thing
+```
+
+Keep worktrees outside the `ros2_ws/src/` tree so `colcon` does not double-build the package.
 
