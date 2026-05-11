@@ -11,12 +11,14 @@ KSPBridge::KSPBridge()
     declare_parameter<double>("publish_rate_hz", 10.0);
     declare_parameter<double>("parts_publish_rate_hz", 1.0);
     declare_parameter<double>("bodies_publish_rate_hz", 1.0);
+    declare_parameter<double>("clock_publish_rate_hz", 100.0);
     declare_parameter<std::vector<std::string>>("celestial_bodies", {"kerbin"});
     declare_parameter<std::string>("control_input_mode", "override");
 
     double fast_rate_hz = get_parameter("publish_rate_hz").as_double();
     double parts_rate_hz = get_parameter("parts_publish_rate_hz").as_double();
     double bodies_rate_hz = get_parameter("bodies_publish_rate_hz").as_double();
+    double clock_rate_hz = get_parameter("clock_publish_rate_hz").as_double();
     m_param_celestial_bodies = get_parameter("celestial_bodies").as_string_array();
     m_param_control_input_mode = get_parameter("control_input_mode").as_string();
 
@@ -40,6 +42,7 @@ KSPBridge::KSPBridge()
     auto fast_period = validated_period("publish_rate_hz", fast_rate_hz);
     auto parts_period = validated_period("parts_publish_rate_hz", parts_rate_hz);
     auto bodies_period = validated_period("bodies_publish_rate_hz", bodies_rate_hz);
+    auto clock_period = validated_period("clock_publish_rate_hz", clock_rate_hz);
 
     connect();
     find_active_vessel();
@@ -51,9 +54,17 @@ KSPBridge::KSPBridge()
         return;
     }
 
+    // /clock is independent of vessel state — SpaceCenter::ut is a session
+    // property — so the publisher is created here rather than in
+    // init_interfaces (which runs per active-vessel acquisition).
+    rclcpp::QoS clock_qos(rclcpp::KeepLast(1));
+    clock_qos.reliable();
+    m_clock_publisher = create_publisher<rosgraph_msgs::msg::Clock>("/clock", clock_qos);
+
     m_fast_timer = create_wall_timer(fast_period, std::bind(&KSPBridge::publish_fast, this));
     m_parts_timer = create_wall_timer(parts_period, std::bind(&KSPBridge::publish_parts, this));
     m_bodies_timer = create_wall_timer(bodies_period, std::bind(&KSPBridge::publish_bodies, this));
+    m_clock_timer = create_wall_timer(clock_period, std::bind(&KSPBridge::publish_clock, this));
 }
 
 void KSPBridge::connect()
@@ -61,6 +72,7 @@ void KSPBridge::connect()
     // Drop anything tied to the old client before we replace it. If the
     // connection is already dead, .remove() will throw and be swallowed.
     teardown_fast_streams();
+    teardown_ut_stream();
     if (m_active_vessel_stream_valid) {
         try {
             m_active_vessel_stream.remove();
@@ -98,6 +110,37 @@ void KSPBridge::connect()
     }
 
     RCLCPP_INFO(get_logger(), "Connected to kRPC server v%s", m_krpc->get_status().version().c_str());
+
+    setup_ut_stream();
+}
+
+void KSPBridge::setup_ut_stream()
+{
+    if (!m_space_center) {
+        return;
+    }
+    try {
+        m_ut_stream = m_space_center->ut_stream();
+        (void)m_ut_stream();
+        m_ut_stream_valid = true;
+    } catch (const std::exception& ex) {
+        RCLCPP_WARN(get_logger(),
+            "ut_stream setup failed, falling back to per-tick RPC: %s", ex.what());
+        m_ut_stream_valid = false;
+    }
+}
+
+void KSPBridge::teardown_ut_stream()
+{
+    if (!m_ut_stream_valid) {
+        return;
+    }
+    try {
+        m_ut_stream.remove();
+    } catch (...) {
+    }
+    m_ut_stream = {};
+    m_ut_stream_valid = false;
 }
 
 bool KSPBridge::is_valid_screen()

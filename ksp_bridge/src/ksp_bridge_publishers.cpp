@@ -1,8 +1,47 @@
+#include <cmath>
+
 #include <krpc/services/krpc.hpp>
 #include <ksp_bridge/ksp_bridge.hpp>
 #include <ksp_bridge/utils.hpp>
 #include <ksp_bridge_interfaces/msg/celestial_body.hpp>
 #include <ksp_bridge_interfaces/msg/resource.hpp>
+
+void KSPBridge::publish_clock()
+{
+    if (!m_clock_publisher) {
+        return;
+    }
+
+    double ut;
+    try {
+        if (m_ut_stream_valid) {
+            ut = m_ut_stream();
+        } else if (m_space_center) {
+            ut = m_space_center->ut();
+        } else {
+            return;
+        }
+    } catch (...) {
+        return;
+    }
+
+    // Suppress duplicate samples so /clock topic-hz drops to 0 when KSP
+    // is paused or time-warping under physics-disabled rails. The
+    // builtin Time stamp doesn't change either way, so use_sim_time
+    // consumers see a frozen clock during pause — this just keeps the
+    // wire idle in that case.
+    if (ut <= m_last_published_ut) {
+        return;
+    }
+    m_last_published_ut = ut;
+
+    rosgraph_msgs::msg::Clock msg;
+    double sec_d;
+    double frac = std::modf(ut, &sec_d);
+    msg.clock.sec = static_cast<int32_t>(sec_d);
+    msg.clock.nanosec = static_cast<uint32_t>(frac * 1.0e9);
+    m_clock_publisher->publish(msg);
+}
 
 void KSPBridge::publish_fast()
 {
