@@ -17,6 +17,7 @@
 #include <ksp_bridge_interfaces/srv/string.hpp>
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
+#include <rosgraph_msgs/msg/clock.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 
 class KSPBridge : public rclcpp::Node {
@@ -160,6 +161,14 @@ private:
     krpc::Stream<krpc::services::SpaceCenter::Vessel> m_active_vessel_stream;
     bool m_active_vessel_stream_valid = false;
 
+    // Streamed universal time, source of truth for /clock. Lives on the
+    // SpaceCenter (session) — independent of the active vessel — so it
+    // ticks even before find_active_vessel() succeeds and survives vessel
+    // changes. Re-established by connect() on reconnection.
+    krpc::Stream<double> m_ut_stream;
+    bool m_ut_stream_valid = false;
+    double m_last_published_ut = -1.0;
+
     std::unique_ptr<krpc::Client> m_ksp_client;
     std::unique_ptr<krpc::services::KRPC> m_krpc;
     std::unique_ptr<krpc::services::SpaceCenter> m_space_center;
@@ -176,12 +185,14 @@ private:
     rclcpp::Publisher<ksp_bridge_interfaces::msg::Parts>::SharedPtr m_parts_publisher;
     rclcpp::Publisher<ksp_bridge_interfaces::msg::CelestialBodies>::SharedPtr m_celestial_bodies_publisher;
     rclcpp::Publisher<ksp_bridge_interfaces::msg::Orbit>::SharedPtr m_orbit_publisher;
+    rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr m_clock_publisher;
 
     std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
 
     rclcpp::TimerBase::SharedPtr m_fast_timer;
     rclcpp::TimerBase::SharedPtr m_parts_timer;
     rclcpp::TimerBase::SharedPtr m_bodies_timer;
+    rclcpp::TimerBase::SharedPtr m_clock_timer;
 
     ksp_bridge_interfaces::msg::Vessel m_vessel_data;
     ksp_bridge_interfaces::msg::Control m_control_data;
@@ -202,6 +213,10 @@ private:
     void publish_fast();
     void publish_parts();
     void publish_bodies();
+    void publish_clock();
+
+    void setup_ut_stream();
+    void teardown_ut_stream();
 
     // subscribers
     rclcpp::Subscription<ksp_bridge_interfaces::msg::CmdThrottle>::SharedPtr m_cmd_throttle_sub;
