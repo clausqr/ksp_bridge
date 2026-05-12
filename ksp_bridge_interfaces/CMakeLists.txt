@@ -27,6 +27,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   msg/Parts.msg
   msg/Resource.msg
   msg/Vessel.msg
+  srv/ActionGroup.srv
   srv/Activation.srv
   srv/SAS.srv
   srv/String.srv

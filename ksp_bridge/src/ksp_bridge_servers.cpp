@@ -102,6 +102,33 @@ void KSPBridge::set_sas_srv(
     res->succeded = true;
 }
 
+void KSPBridge::set_action_group_srv(
+    const ksp_bridge_interfaces::srv::ActionGroup::Request::SharedPtr req,
+    const ksp_bridge_interfaces::srv::ActionGroup::Response::SharedPtr res)
+{
+    if (!m_vessel) {
+        res->succeded = false;
+        res->error = "No active vessel.";
+        return;
+    }
+    if (req->group < 1 || req->group > 10) {
+        res->succeded = false;
+        res->error = "group must be in [1, 10] (KSP custom action groups).";
+        RCLCPP_ERROR(get_logger(), "%s:%d: invalid action group %u", base_name(__FILE__), __LINE__, req->group);
+        return;
+    }
+    try {
+        m_vessel->control().set_action_group(req->group, req->value);
+    } catch (const std::exception& ex) {
+        res->succeded = false;
+        res->error = std::string(ex.what());
+        RCLCPP_ERROR(get_logger(), "%s:%d: %s", base_name(__FILE__), __LINE__, ex.what());
+        return;
+    }
+
+    res->succeded = true;
+}
+
 void KSPBridge::set_reference_frame(
     const ksp_bridge_interfaces::srv::String::Request::SharedPtr req,
     const ksp_bridge_interfaces::srv::String::Response::SharedPtr res)
@@ -113,4 +140,44 @@ void KSPBridge::set_reference_frame(
         res->error = "Unknown reference frame";
         RCLCPP_ERROR(get_logger(), "%s:%d: Unknown reference frame: '%s'", base_name(__FILE__), __LINE__, req->value.c_str());
     }
+}
+
+void KSPBridge::set_brakes_srv(
+    const ksp_bridge_interfaces::srv::Switch::Request::SharedPtr req,
+    const ksp_bridge_interfaces::srv::Switch::Response::SharedPtr res)
+{
+    if (!m_vessel) {
+        res->succeded = false;
+        res->error = "No active vessel.";
+        return;
+    }
+    try {
+        m_vessel->control().set_brakes(req->value);
+    } catch (const std::exception& ex) {
+        res->succeded = false;
+        res->error = std::string(ex.what());
+        RCLCPP_ERROR(get_logger(), "%s:%d: %s", base_name(__FILE__), __LINE__, ex.what());
+        return;
+    }
+    res->succeded = true;
+}
+
+void KSPBridge::set_gear_srv(
+    const ksp_bridge_interfaces::srv::Switch::Request::SharedPtr req,
+    const ksp_bridge_interfaces::srv::Switch::Response::SharedPtr res)
+{
+    if (!m_vessel) {
+        res->succeded = false;
+        res->error = "No active vessel.";
+        return;
+    }
+    try {
+        m_vessel->control().set_gear(req->value);
+    } catch (const std::exception& ex) {
+        res->succeded = false;
+        res->error = std::string(ex.what());
+        RCLCPP_ERROR(get_logger(), "%s:%d: %s", base_name(__FILE__), __LINE__, ex.what());
+        return;
+    }
+    res->succeded = true;
 }
