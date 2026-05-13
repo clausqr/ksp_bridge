@@ -12,9 +12,11 @@
 #include <ksp_bridge_interfaces/msg/orbit.hpp>
 #include <ksp_bridge_interfaces/msg/parts.hpp>
 #include <ksp_bridge_interfaces/msg/vessel.hpp>
+#include <ksp_bridge_interfaces/srv/action_group.hpp>
 #include <ksp_bridge_interfaces/srv/activation.hpp>
 #include <ksp_bridge_interfaces/srv/sas.hpp>
 #include <ksp_bridge_interfaces/srv/string.hpp>
+#include <ksp_bridge_interfaces/srv/switch.hpp>
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
 #include <rosgraph_msgs/msg/clock.hpp>
@@ -229,6 +231,9 @@ private:
     rclcpp::Service<ksp_bridge_interfaces::srv::Activation>::SharedPtr m_next_stage_srv;
     rclcpp::Service<ksp_bridge_interfaces::srv::SAS>::SharedPtr m_set_sas_srv;
     rclcpp::Service<ksp_bridge_interfaces::srv::String>::SharedPtr m_set_reference_frame_srv;
+    rclcpp::Service<ksp_bridge_interfaces::srv::ActionGroup>::SharedPtr m_set_action_group_srv;
+    rclcpp::Service<ksp_bridge_interfaces::srv::Switch>::SharedPtr m_set_brakes_srv;
+    rclcpp::Service<ksp_bridge_interfaces::srv::Switch>::SharedPtr m_set_gear_srv;
 
     void next_stage_srv(
         const ksp_bridge_interfaces::srv::Activation::Request::SharedPtr,
@@ -237,6 +242,18 @@ private:
     void set_sas_srv(
         const ksp_bridge_interfaces::srv::SAS::Request::SharedPtr,
         const ksp_bridge_interfaces::srv::SAS::Response::SharedPtr);
+
+    void set_action_group_srv(
+        const ksp_bridge_interfaces::srv::ActionGroup::Request::SharedPtr,
+        const ksp_bridge_interfaces::srv::ActionGroup::Response::SharedPtr);
+
+    void set_brakes_srv(
+        const ksp_bridge_interfaces::srv::Switch::Request::SharedPtr,
+        const ksp_bridge_interfaces::srv::Switch::Response::SharedPtr);
+
+    void set_gear_srv(
+        const ksp_bridge_interfaces::srv::Switch::Request::SharedPtr,
+        const ksp_bridge_interfaces::srv::Switch::Response::SharedPtr);
 
     void set_reference_frame(
         const ksp_bridge_interfaces::srv::String::Request::SharedPtr,

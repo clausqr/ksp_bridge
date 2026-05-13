@@ -619,4 +619,22 @@ void KSPBridge::init_interfaces()
         std::bind(
             &KSPBridge::set_reference_frame, this,
             std::placeholders::_1, std::placeholders::_2));
+
+    m_set_action_group_srv = create_service<ksp_bridge_interfaces::srv::ActionGroup>(
+        "/set_action_group",
+        std::bind(
+            &KSPBridge::set_action_group_srv, this,
+            std::placeholders::_1, std::placeholders::_2));
+
+    m_set_brakes_srv = create_service<ksp_bridge_interfaces::srv::Switch>(
+        "/set_brakes",
+        std::bind(
+            &KSPBridge::set_brakes_srv, this,
+            std::placeholders::_1, std::placeholders::_2));
+
+    m_set_gear_srv = create_service<ksp_bridge_interfaces::srv::Switch>(
+        "/set_gear",
+        std::bind(
+            &KSPBridge::set_gear_srv, this,
+            std::placeholders::_1, std::placeholders::_2));
 }
